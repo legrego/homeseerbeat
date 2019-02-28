@@ -1,0 +1,5 @@
+= Homeseerbeat Docs
+
+Welcome to the Homeseerbeat documentation.
+
+
