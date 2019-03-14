@@ -5,3 +5,5 @@
 /homeseerbeat
 /homeseerbeat.test
 *.pyc
+
+/homeseerbeat_state.json
