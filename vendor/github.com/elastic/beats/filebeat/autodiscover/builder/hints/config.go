@@ -28,8 +28,10 @@ func defaultConfig() config {
 	rawCfg := map[string]interface{}{
 		"type": "docker",
 		"containers": map[string]interface{}{
-			"ids": []string{
-				"${data.container.id}",
+			"paths": []string{
+				// To be able to use this builder with CRI-O replace paths with:
+				// /var/log/pods/${data.kubernetes.pod.uid}/${data.kubernetes.container.name}/*.log
+				"/var/lib/docker/containers/${data.container.id}/*-json.log",
 			},
 		},
 	}
@@ -38,4 +40,22 @@ func defaultConfig() config {
 		Key:    "logs",
 		Config: cfg,
 	}
+}
+
+func (c *config) Unpack(from *common.Config) error {
+	tmpConfig := struct {
+		Key string `config:"key"`
+	}{
+		Key: c.Key,
+	}
+	if err := from.Unpack(&tmpConfig); err != nil {
+		return err
+	}
+
+	if config, err := from.Child("config", -1); err == nil {
+		c.Config = config
+	}
+
+	c.Key = tmpConfig.Key
+	return nil
 }

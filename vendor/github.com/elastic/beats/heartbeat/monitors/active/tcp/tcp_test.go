@@ -30,11 +30,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/beats/heartbeat/hbtest"
+	"github.com/elastic/beats/heartbeat/monitors/wrappers"
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/mapval"
 	btesting "github.com/elastic/beats/libbeat/testing"
-	"github.com/elastic/beats/libbeat/testing/mapvaltest"
 )
 
 func testTCPCheck(t *testing.T, host string, port uint16) *beat.Event {
@@ -48,14 +48,15 @@ func testTCPCheck(t *testing.T, host string, port uint16) *beat.Event {
 	jobs, endpoints, err := create("tcp", config)
 	require.NoError(t, err)
 
-	job := jobs[0]
+	job := wrappers.WrapCommon(jobs, "test", "", "tcp")[0]
 
-	event, _, err := job.Run()
+	event := &beat.Event{}
+	_, err = job(event)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, endpoints)
 
-	return &event
+	return event
 }
 
 func testTLSTCPCheck(t *testing.T, host string, port uint16, certFileName string) *beat.Event {
@@ -70,14 +71,15 @@ func testTLSTCPCheck(t *testing.T, host string, port uint16, certFileName string
 	jobs, endpoints, err := create("tcp", config)
 	require.NoError(t, err)
 
-	job := jobs[0]
+	job := wrappers.WrapCommon(jobs, "test", "", "tcp")[0]
 
-	event, _, err := job.Run()
+	event := &beat.Event{}
+	_, err = job(event)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, endpoints)
 
-	return &event
+	return event
 }
 
 func setupServer(t *testing.T, serverCreator func(http.Handler) *httptest.Server) (*httptest.Server, uint16) {
@@ -90,8 +92,7 @@ func setupServer(t *testing.T, serverCreator func(http.Handler) *httptest.Server
 }
 
 func tcpMonitorChecks(host string, ip string, port uint16, status string) mapval.Validator {
-	id := fmt.Sprintf("tcp-tcp@%s:%d", host, port)
-	return hbtest.MonitorChecks(id, host, ip, "tcp", status)
+	return hbtest.BaseChecks(ip, status, "tcp")
 }
 
 func TestUpEndpointJob(t *testing.T) {
@@ -100,20 +101,15 @@ func TestUpEndpointJob(t *testing.T) {
 
 	event := testTCPCheck(t, "localhost", port)
 
-	mapvaltest.Test(
+	mapval.Test(
 		t,
 		mapval.Strict(mapval.Compose(
-			hbtest.MonitorChecks(
-				fmt.Sprintf("tcp-tcp@localhost:%d", port),
-				"localhost",
-				"127.0.0.1",
-				"tcp",
-				"up",
-			),
-			hbtest.RespondingTCPChecks(port),
+			hbtest.BaseChecks("127.0.0.1", "up", "tcp"),
+			hbtest.SummaryChecks(1, 0),
+			hbtest.SimpleURLChecks(t, "tcp", "localhost", port),
+			hbtest.RespondingTCPChecks(),
 			mapval.MustCompile(mapval.Map{
 				"resolve": mapval.Map{
-					"host":   "localhost",
 					"ip":     "127.0.0.1",
 					"rtt.us": mapval.IsDuration,
 				},
@@ -148,18 +144,14 @@ func TestTLSConnection(t *testing.T) {
 	defer os.Remove(certFile.Name())
 
 	event := testTLSTCPCheck(t, ip, port, certFile.Name())
-	mapvaltest.Test(
+	mapval.Test(
 		t,
 		mapval.Strict(mapval.Compose(
 			hbtest.TLSChecks(0, 0, cert),
-			hbtest.MonitorChecks(
-				fmt.Sprintf("tcp-ssl@%s:%d", ip, port),
-				serverURL.Hostname(),
-				ip,
-				"ssl",
-				"up",
-			),
-			hbtest.RespondingTCPChecks(port),
+			hbtest.RespondingTCPChecks(),
+			hbtest.BaseChecks(ip, "up", "tcp"),
+			hbtest.SummaryChecks(1, 0),
+			hbtest.SimpleURLChecks(t, "ssl", serverURL.Hostname(), port),
 		)),
 		event.Fields,
 	)
@@ -173,12 +165,13 @@ func TestConnectionRefusedEndpointJob(t *testing.T) {
 	event := testTCPCheck(t, ip, port)
 
 	dialErr := fmt.Sprintf("dial tcp %s:%d", ip, port)
-	mapvaltest.Test(
+	mapval.Test(
 		t,
 		mapval.Strict(mapval.Compose(
 			tcpMonitorChecks(ip, ip, port, "down"),
+			hbtest.SummaryChecks(0, 1),
+			hbtest.SimpleURLChecks(t, "tcp", ip, port),
 			hbtest.ErrorChecks(dialErr, "io"),
-			hbtest.TCPBaseChecks(port),
 		)),
 		event.Fields,
 	)
@@ -190,12 +183,13 @@ func TestUnreachableEndpointJob(t *testing.T) {
 	event := testTCPCheck(t, ip, port)
 
 	dialErr := fmt.Sprintf("dial tcp %s:%d", ip, port)
-	mapvaltest.Test(
+	mapval.Test(
 		t,
 		mapval.Strict(mapval.Compose(
 			tcpMonitorChecks(ip, ip, port, "down"),
+			hbtest.SummaryChecks(0, 1),
+			hbtest.SimpleURLChecks(t, "tcp", ip, port),
 			hbtest.ErrorChecks(dialErr, "io"),
-			hbtest.TCPBaseChecks(port),
 		)),
 		event.Fields,
 	)

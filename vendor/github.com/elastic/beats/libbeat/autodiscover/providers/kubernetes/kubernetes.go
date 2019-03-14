@@ -77,7 +77,7 @@ func AutodiscoverBuilder(bus bus.Bus, uuid uuid.UUID, c *common.Config) (autodis
 		Namespace:   config.Namespace,
 	})
 	if err != nil {
-		logp.Err("kubernetes: Couldn't create watcher for %t", &kubernetes.Pod{})
+		logp.Err("kubernetes: Couldn't create watcher for %T", &kubernetes.Pod{})
 		return nil, err
 	}
 
@@ -275,12 +275,13 @@ func (p *Provider) generateHints(event bus.Event) bus.Event {
 	}
 
 	cname := builder.GetContainerName(container)
-	hints := builder.GenerateHints(annotations, cname, p.config.Prefix)
+	hints := builder.GenerateHints(annotations, cname, p.config.Prefix, p.config.DefaultDisable)
+	logp.Debug("kubernetes", "Generated hints %+v", hints)
 	if len(hints) != 0 {
 		e["hints"] = hints
 	}
 
-	logp.Debug("kubernetes", "Generated builder event %v", event)
+	logp.Debug("kubernetes", "Generated builder event %+v", e)
 
 	return e
 }
