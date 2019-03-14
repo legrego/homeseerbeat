@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/tests/compose"
 	mbtest "github.com/elastic/beats/metricbeat/mb/testing"
 	"github.com/elastic/beats/metricbeat/module/mongodb"
@@ -32,40 +33,33 @@ import (
 func TestFetch(t *testing.T) {
 	compose.EnsureUp(t, "mongodb")
 
-	f := mbtest.NewReportingMetricSetV2(t, getConfig())
-	events, errs := mbtest.ReportingFetchV2(f)
-
-	assert.Empty(t, errs)
-	if !assert.NotEmpty(t, events) {
+	f := mbtest.NewEventFetcher(t, getConfig())
+	event, err := f.Fetch()
+	if !assert.NoError(t, err) {
 		t.FailNow()
 	}
 
-	t.Logf("%s/%s event: %+v", f.Module().Name(), f.Name(),
-		events[0].BeatEvent("mongodb", "status").Fields.StringToPrint())
-
-	event := events[0].BeatEvent("mongodb", "status").Fields
+	t.Logf("%s/%s event: %+v", f.Module().Name(), f.Name(), event)
 
 	// Check event fields
-	current, _ := event.GetValue("mongodb.status.connections.current")
-	assert.True(t, current.(int64) >= 0)
+	current := event["connections"].(common.MapStr)["current"].(int64)
+	assert.True(t, current >= 0)
 
-	available, _ := event.GetValue("mongodb.status.connections.available")
-	assert.True(t, available.(int64) > 0)
+	available := event["connections"].(common.MapStr)["available"].(int64)
+	assert.True(t, available > 0)
 
-	pageFaults, _ := event.GetValue("mongodb.status.extra_info.page_faults")
-	assert.True(t, pageFaults.(int64) >= 0)
+	pageFaults := event["extra_info"].(common.MapStr)["page_faults"].(int64)
+	assert.True(t, pageFaults >= 0)
 }
 
 func TestData(t *testing.T) {
 	compose.EnsureUp(t, "mongodb")
 
-	config := getConfig()
-	f := mbtest.NewReportingMetricSetV2(t, config)
-	err := mbtest.WriteEventsReporterV2(f, t, ".")
+	f := mbtest.NewEventFetcher(t, getConfig())
+	err := mbtest.WriteEvent(f, t)
 	if err != nil {
 		t.Fatal("write", err)
 	}
-
 }
 
 func getConfig() map[string]interface{} {

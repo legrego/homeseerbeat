@@ -9,3 +9,7 @@ exclude_files: [".gz$"]
 processors:
 - add_locale: ~
 {{ end }}
+
+fields:
+  service.name: "elasticsearch"
+fields_under_root: true

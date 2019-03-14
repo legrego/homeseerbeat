@@ -37,7 +37,6 @@ const (
 	Updated
 	Moved
 	ConfigChange
-	InitialScan
 )
 
 var actionNames = map[Action]string{
@@ -48,7 +47,6 @@ var actionNames = map[Action]string{
 	Updated:            "updated",
 	Moved:              "moved",
 	ConfigChange:       "config_change",
-	InitialScan:        "initial_scan",
 }
 
 type actionOrderKey struct {

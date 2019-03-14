@@ -21,7 +21,7 @@ journalbeat.inputs:
   # The number of seconds to wait before trying to read again from journals.
   #backoff: 1s
   # The maximum number of seconds to wait before attempting to read again from journals.
-  #max_backoff: 20s
+  #max_backoff: 60s
 
   # Position to start reading from journal. Valid values: head, tail, cursor
   seek: cursor
@@ -45,11 +45,17 @@ journalbeat.inputs:
   # data path.
   #registry_file: registry
 
-#==================== Elasticsearch template setting ==========================
-setup.template.settings:
-  index.number_of_shards: 1
-  #index.codec: best_compression
-  #_source.enabled: false
+  # The number of seconds to wait before trying to read again from journals.
+  #backoff: 1s
+  # The maximum number of seconds to wait before attempting to read again from journals.
+  #max_backoff: 60s
+
+  # Position to start reading from all journal. Possible values: head, tail, cursor
+  #seek: head
+
+  # Exact matching for field values of events.
+  # Matching for nginx entries: "systemd.unit=nginx"
+  #matches: []
 
 #================================ General =====================================
 
@@ -70,7 +76,7 @@ setup.template.settings:
 #============================== Dashboards =====================================
 # These settings control loading the sample dashboards to the Kibana index. Loading
 # the dashboards is disabled by default and can be enabled either by setting the
-# options here or by using the `setup` command.
+# options here, or by using the `-setup` CLI flag or the `setup` command.
 #setup.dashboards.enabled: false
 
 # The URL from where to download the dashboards archive. By default this URL
@@ -117,6 +123,9 @@ setup.kibana:
 output.elasticsearch:
   # Array of hosts to connect to.
   hosts: ["localhost:9200"]
+
+  # Enabled ilm (beta) to use index lifecycle management instead daily indices.
+  #ilm.enabled: false
 
   # Optional protocol and basic auth credentials.
   #protocol: "https"
@@ -171,8 +180,3 @@ processors:
 # have the Elasticsearch output configured, you can simply uncomment the
 # following line.
 #xpack.monitoring.elasticsearch:
-
-#================================= Migration ==================================
-
-# This allows to enable migration aliases
-#migration.enabled: false

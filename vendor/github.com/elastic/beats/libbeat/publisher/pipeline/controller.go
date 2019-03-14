@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/reload"
+	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/outputs"
 	"github.com/elastic/beats/libbeat/publisher/queue"
 )
@@ -32,6 +33,8 @@ import (
 type outputController struct {
 	beat     beat.Info
 	monitors Monitors
+
+	logger   *logp.Logger
 	observer outputObserver
 
 	queue queue.Queue
@@ -61,19 +64,21 @@ type outputWorker interface {
 func newOutputController(
 	beat beat.Info,
 	monitors Monitors,
+	log *logp.Logger,
 	observer outputObserver,
 	b queue.Queue,
 ) *outputController {
 	c := &outputController{
 		beat:     beat,
 		monitors: monitors,
+		logger:   log,
 		observer: observer,
 		queue:    b,
 	}
 
 	ctx := &batchContext{}
-	c.consumer = newEventConsumer(monitors.Logger, b, ctx)
-	c.retryer = newRetryer(monitors.Logger, observer, nil, c.consumer)
+	c.consumer = newEventConsumer(log, b, ctx)
+	c.retryer = newRetryer(log, observer, nil, c.consumer)
 	ctx.observer = observer
 	ctx.retryer = c.retryer
 
@@ -146,22 +151,16 @@ func makeWorkQueue() workQueue {
 }
 
 // Reload the output
-func (c *outputController) Reload(
-	cfg *reload.ConfigWithMeta,
-	outFactory func(outputs.Observer, common.ConfigNamespace) (outputs.Group, error),
-) error {
-	outCfg := common.ConfigNamespace{}
+func (c *outputController) Reload(cfg *reload.ConfigWithMeta) error {
+	outputCfg := common.ConfigNamespace{}
+
 	if cfg != nil {
-		if err := cfg.Config.Unpack(&outCfg); err != nil {
+		if err := cfg.Config.Unpack(&outputCfg); err != nil {
 			return err
 		}
 	}
 
-	output, err := loadOutput(c.monitors, func(stats outputs.Observer) (string, outputs.Group, error) {
-		name := outCfg.Name()
-		out, err := outFactory(stats, outCfg)
-		return name, out, err
-	})
+	output, err := loadOutput(c.beat, c.monitors, outputCfg)
 	if err != nil {
 		return err
 	}

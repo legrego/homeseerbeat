@@ -42,6 +42,6 @@
         Image labels.
 
     - name: tags
-      type: keyword
+      type: array
       description: >
         Image tags.

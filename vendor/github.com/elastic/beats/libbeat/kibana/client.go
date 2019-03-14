@@ -217,8 +217,8 @@ func (client *Client) readVersion() error {
 
 	code, result, err := client.Connection.Request("GET", "/api/status", nil, nil, nil)
 	if err != nil || code >= 400 {
-		return fmt.Errorf("HTTP GET request to %s/api/status fails: %v. Response: %s.",
-			client.Connection.URL, err, truncateString(result))
+		return fmt.Errorf("HTTP GET request to /api/status fails: %v. Response: %s.",
+			err, truncateString(result))
 	}
 
 	var versionString string
@@ -226,15 +226,23 @@ func (client *Client) readVersion() error {
 	var kibanaVersion kibanaVersionResponse
 	err = json.Unmarshal(result, &kibanaVersion)
 	if err != nil {
-		return fmt.Errorf("fail to unmarshal the response from GET %s/api/status. Response: %s. Kibana status api returns: %v",
-			client.Connection.URL, truncateString(result), err)
-	}
+		var kibanaVersion5x kibanaVersionResponse5x
 
-	versionString = kibanaVersion.Version.Number
+		// The response returned by /api/status is different in Kibana 5.x than in Kibana 6.x
+		err5x := json.Unmarshal(result, &kibanaVersion5x)
+		if err5x != nil {
 
-	if kibanaVersion.Version.Snapshot {
-		// needed for the tests
-		versionString += "-SNAPSHOT"
+			return fmt.Errorf("fail to unmarshal the response from GET %s/api/status. Response: %s. Kibana 5.x status api returns: %v. Kibana 6.x status api returns: %v",
+				client.Connection.URL, truncateString(result), err5x, err)
+		}
+		versionString = kibanaVersion5x.Version
+	} else {
+		versionString = kibanaVersion.Version.Number
+
+		if kibanaVersion.Version.Snapshot {
+			// needed for the tests
+			versionString += "-SNAPSHOT"
+		}
 	}
 
 	version, err := common.NewVersion(versionString)

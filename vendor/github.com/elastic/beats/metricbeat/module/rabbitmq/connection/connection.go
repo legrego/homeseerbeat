@@ -18,6 +18,8 @@
 package connection
 
 import (
+	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/rabbitmq"
 )
@@ -36,6 +38,8 @@ type MetricSet struct {
 
 // New creates new instance of MetricSet
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	cfgwarn.Beta("The rabbitmq connection metricset is beta")
+
 	ms, err := rabbitmq.NewMetricSet(base, rabbitmq.ConnectionsPath)
 	if err != nil {
 		return nil, err
@@ -44,13 +48,13 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 }
 
 // Fetch makes an HTTP request to fetch connections metrics from the connections endpoint.
-func (m *MetricSet) Fetch(r mb.ReporterV2) {
+func (m *MetricSet) Fetch() ([]common.MapStr, error) {
 	content, err := m.HTTP.FetchContent()
 
 	if err != nil {
-		r.Error(err)
-		return
+		return nil, err
 	}
 
-	eventsMapping(content, r)
+	events, _ := eventsMapping(content)
+	return events, nil
 }

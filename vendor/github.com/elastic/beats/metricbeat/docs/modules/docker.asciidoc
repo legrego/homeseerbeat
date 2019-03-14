@@ -38,7 +38,6 @@ metricbeat.modules:
     - "container"
     - "cpu"
     - "diskio"
-    - "event"
     - "healthcheck"
     - "info"
     #- "image"
@@ -72,8 +71,6 @@ The following metricsets are available:
 
 * <<metricbeat-metricset-docker-diskio,diskio>>
 
-* <<metricbeat-metricset-docker-event,event>>
-
 * <<metricbeat-metricset-docker-healthcheck,healthcheck>>
 
 * <<metricbeat-metricset-docker-image,image>>
@@ -89,8 +86,6 @@ include::docker/container.asciidoc[]
 include::docker/cpu.asciidoc[]
 
 include::docker/diskio.asciidoc[]
-
-include::docker/event.asciidoc[]
 
 include::docker/healthcheck.asciidoc[]
 

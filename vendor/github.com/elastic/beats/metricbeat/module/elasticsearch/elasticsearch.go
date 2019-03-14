@@ -33,7 +33,7 @@ import (
 )
 
 // CCRStatsAPIAvailableVersion is the version of Elasticsearch since when the CCR stats API is available.
-var CCRStatsAPIAvailableVersion = common.MustNewVersion("6.5.0")
+const CCRStatsAPIAvailableVersion = "6.5.0"
 
 // Global clusterIdCache. Assumption is that the same node id never can belong to a different cluster id.
 var clusterIDCache = map[string]string{}
@@ -46,7 +46,7 @@ type Info struct {
 	ClusterName string `json:"cluster_name"`
 	ClusterID   string `json:"cluster_uuid"`
 	Version     struct {
-		Number *common.Version `json:"number"`
+		Number string `json:"number"`
 	} `json:"version"`
 }
 
@@ -158,10 +158,7 @@ func GetInfo(http *helper.HTTP, uri string) (*Info, error) {
 	}
 
 	info := &Info{}
-	err = json.Unmarshal(content, &info)
-	if err != nil {
-		return nil, err
-	}
+	json.Unmarshal(content, info)
 
 	return info, nil
 }
@@ -211,20 +208,9 @@ func GetLicense(http *helper.HTTP, resetURI string) (*License, error) {
 	// First, check the cache
 	license := licenseCache.get()
 
-	info, err := GetInfo(http, resetURI)
-	if err != nil {
-		return nil, err
-	}
-	var licensePath string
-	if info.Version.Number.Major < 7 {
-		licensePath = "_xpack/license"
-	} else {
-		licensePath = "_license"
-	}
-
 	// Not cached, fetch license from Elasticsearch
 	if license == nil {
-		content, err := fetchPath(http, resetURI, licensePath, "")
+		content, err := fetchPath(http, resetURI, "_xpack/license", "")
 		if err != nil {
 			return nil, err
 		}

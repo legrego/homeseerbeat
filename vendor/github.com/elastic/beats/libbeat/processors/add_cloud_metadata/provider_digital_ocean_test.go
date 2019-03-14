@@ -112,12 +112,12 @@ func TestRetrieveDigitalOceanMetadata(t *testing.T) {
 	}
 
 	expected := common.MapStr{
-		"cloud": common.MapStr{
-			"provider": "digitalocean",
-			"instance": common.MapStr{
-				"id": "1111111",
+		"meta": common.MapStr{
+			"cloud": common.MapStr{
+				"provider":    "digitalocean",
+				"instance_id": "1111111",
+				"region":      "nyc3",
 			},
-			"region": "nyc3",
 		},
 	}
 	assert.Equal(t, expected, actual.Fields)

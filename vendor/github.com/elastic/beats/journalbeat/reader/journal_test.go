@@ -65,10 +65,8 @@ func TestToEvent(t *testing.T) {
 				},
 			},
 			expectedFields: common.MapStr{
-				"journald": common.MapStr{
-					"custom": common.MapStr{
-						"my_custom_field": "value",
-					},
+				"custom": common.MapStr{
+					"my_custom_field": "value",
 				},
 			},
 		},
@@ -90,7 +88,7 @@ func TestToEvent(t *testing.T) {
 	}
 	for _, test := range tests {
 		event := r.toEvent(&test.entry)
-		event.Fields.Delete("event")
+		delete(event.Fields, "read_timestamp")
 		assert.True(t, reflect.DeepEqual(event.Fields, test.expectedFields))
 	}
 }

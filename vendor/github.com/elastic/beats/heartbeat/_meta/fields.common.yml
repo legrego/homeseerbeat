@@ -32,16 +32,12 @@
               description: Duration in microseconds
 
         - name: scheme
-          type: alias
-          path: url.scheme
-          migration: true
+          type: keyword
           description: >
             Address url scheme. For example `tcp`, `tls`, `http`, and `https`.
 
         - name: host
-          type: alias
-          path: url.domain
-          migration: true
+          type: keyword
           description: >
             Hostname of service being monitored. Can be missing, if service is
             monitored by IP.
@@ -58,27 +54,6 @@
           description: >
             Indicator if monitor could validate the service to be available.
 
-        - name: check_group
-          type: keyword
-          description: >
-            A token unique to a simultaneously invoked group of checks as in the case where multiple IPs are checked for a single DNS entry.
-
-- key: summary
-  title: "Monitor summary"
-  fields:
-    - name: summary
-      type: group
-      description: "Present in the last event emitted during a check. If a monitor checks multiple endpoints, as is the case with `mode: all`."
-      fields:
-        - name: up
-          type: integer
-          description: >
-            The number of endpoints that succeeded
-        - name: down
-          type: integer
-          description: >
-            The number of endpoints that failed
-
 - key: resolve
   title: "Host lookup"
   description:
@@ -89,9 +64,7 @@
         Host lookup fields.
       fields:
         - name: host
-          type: alias
-          path: url.domain
-          migration: true
+          type: keyword
           description: >
             Hostname of service being monitored.
 

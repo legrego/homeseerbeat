@@ -2,30 +2,22 @@
   type: group
   description: >
     connection
-  release: ga
+  release: beta
   fields:
     - name: name
-      type: alias
-      path: rabbitmq.name
-      migration: true
+      type: keyword
       description: >
         The name of the connection with non-ASCII characters escaped as in C.
     - name: vhost
-      type: alias
-      path: rabbitmq.vhost
-      migration: true
+      type: keyword
       description: >
         Virtual host name with non-ASCII characters escaped as in C.
     - name: user
-      type: alias
-      path: user.name
-      migration: true
+      type: keyword
       description: >
         User name.
     - name: node
-      type: alias
-      path: rabbitmq.node.name
-      migration: true
+      type: keyword
       description: >
         Node name.
     - name: channels

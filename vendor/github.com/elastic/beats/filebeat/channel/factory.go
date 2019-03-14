@@ -48,8 +48,7 @@ type inputOutletConfig struct {
 	Processors           processors.PluginConfig `config:"processors"`
 
 	// implicit event fields
-	Type        string `config:"type"`         // input.type
-	ServiceType string `config:"service.type"` // service.type
+	Type string `config:"type"` // input.type
 
 	// hidden filebeat modules settings
 	Module  string `config:"_module_name"`  // hidden setting
@@ -104,24 +103,22 @@ func (f *OutletFactory) Create(p beat.Pipeline, cfg *common.Config, dynFields *c
 
 	fields := common.MapStr{}
 	setMeta(fields, "module", config.Module)
-	if config.Module != "" && config.Fileset != "" {
-		setMeta(fields, "dataset", config.Module+"."+config.Fileset)
-	}
+	setMeta(fields, "name", config.Fileset)
 	if len(fields) > 0 {
 		fields = common.MapStr{
-			"event": fields,
+			"fileset": fields,
+			"event": common.MapStr{
+				"dataset": config.Module + "." + config.Fileset,
+			},
 		}
 	}
-	if config.Fileset != "" {
-		fields.Put("fileset.name", config.Fileset)
-	}
-	if config.ServiceType != "" {
-		fields.Put("service.type", config.ServiceType)
-	} else if config.Module != "" {
-		fields.Put("service.type", config.Module)
-	}
 	if config.Type != "" {
-		fields.Put("input.type", config.Type)
+		fields["prospector"] = common.MapStr{
+			"type": config.Type,
+		}
+		fields["input"] = common.MapStr{
+			"type": config.Type,
+		}
 	}
 
 	client, err := p.ConnectWith(beat.ClientConfig{

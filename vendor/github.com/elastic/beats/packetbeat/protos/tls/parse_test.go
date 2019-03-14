@@ -291,6 +291,7 @@ func TestParserHello(t *testing.T) {
 }
 
 func TestCertificates(t *testing.T) {
+
 	parser := &parser{}
 
 	// A certificates message with two certificates
@@ -322,20 +323,8 @@ func TestCertificates(t *testing.T) {
 		"subject.organization":        "Internet Corporation for Assigned Names and Numbers",
 		"subject.organizational_unit": "Technology",
 		"subject.province":            "California",
-		"fingerprint.md5":             "68423d55ea27d0b4fda1878fcab7a1eb",
-		"fingerprint.sha1":            "2509fb22f7671aea2d0a28ae80516f390de0ca21",
-		"fingerprint.sha256":          "642de54d84c30494157f53f657bf9f89b4ea6c8b16351fd7ec258d556f821040",
 	}
-
-	var algos []*FingerprintAlgorithm
-	for _, algo := range []string{"md5", "sha1", "sha256"} {
-		ptr, err := GetFingerprintAlgorithm(algo)
-		if err != nil {
-			t.Fatal(err)
-		}
-		algos = append(algos, ptr)
-	}
-	certMap := certToMap(c[0], false, algos)
+	certMap := certToMap(c[0], false)
 
 	for key, expectedValue := range expected {
 		value, err := certMap.GetValue(key)
@@ -345,7 +334,7 @@ func TestCertificates(t *testing.T) {
 		} else if n, ok := value.(int); ok {
 			value = strconv.Itoa(n)
 		}
-		assert.Equal(t, expectedValue, value, key)
+		assert.Equal(t, expectedValue, value)
 	}
 	san, err := certMap.GetValue("alternative_names")
 	assert.NoError(t, err)
@@ -363,7 +352,7 @@ func TestCertificates(t *testing.T) {
 	// test raw certificates in PEM format
 	for idx, cc := range c {
 		logStr := fmt.Sprintf("certificate %d", idx)
-		certMap = certToMap(cc, true, nil)
+		certMap = certToMap(cc, true)
 		obj, err := certMap.GetValue("raw")
 		assert.NoError(t, err, logStr)
 		cert := obj.(string)

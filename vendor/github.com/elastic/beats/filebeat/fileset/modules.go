@@ -26,7 +26,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	yaml "gopkg.in/yaml.v2"
 
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/kibana"
@@ -36,8 +35,8 @@ import (
 )
 
 var availableMLModules = map[string]string{
-	"apache": "access",
-	"nginx":  "access",
+	"apache2": "access",
+	"nginx":   "access",
 }
 
 type ModuleRegistry struct {
@@ -56,12 +55,6 @@ func newModuleRegistry(modulesPath string,
 	for _, mcfg := range moduleConfigs {
 		if mcfg.Enabled != nil && (*mcfg.Enabled) == false {
 			continue
-		}
-
-		// Look for moved modules
-		if module, moved := getCurrentModuleName(modulesPath, mcfg.Module); moved {
-			logp.Warn("Using old name '%s' for module '%s', please update your configuration", mcfg.Module, module)
-			mcfg.Module = module
 		}
 
 		reg.registry[mcfg.Module] = map[string]*Fileset{}
@@ -187,26 +180,7 @@ func mcfgFromConfig(cfg *common.Config) (*ModuleConfig, error) {
 	return &mcfg, nil
 }
 
-func getCurrentModuleName(modulePath, module string) (string, bool) {
-	moduleConfigPath := filepath.Join(modulePath, module, "module.yml")
-	d, err := ioutil.ReadFile(moduleConfigPath)
-	if err != nil {
-		return module, false
-	}
-
-	var moduleConfig struct {
-		MovedTo string `yaml:"movedTo"`
-	}
-	err = yaml.Unmarshal(d, &moduleConfig)
-	if err == nil && moduleConfig.MovedTo != "" {
-		return moduleConfig.MovedTo, true
-	}
-
-	return module, false
-}
-
 func getModuleFilesets(modulePath, module string) ([]string, error) {
-	module, _ = getCurrentModuleName(modulePath, module)
 	fileInfos, err := ioutil.ReadDir(filepath.Join(modulePath, module))
 	if err != nil {
 		return []string{}, err
@@ -427,11 +401,6 @@ func (reg *ModuleRegistry) SetupML(esClient PipelineLoader, kibanaClient *kibana
 	}
 
 	for module, fileset := range modules {
-		// XXX workaround to setup modules after changing the module IDs due to ECS migration
-		// the proper solution would be to query available modules, and setup the required ones
-		// related issue: https://github.com/elastic/kibana/issues/30934
-		module = module + "_ecs"
-
 		prefix := fmt.Sprintf("filebeat-%s-%s-", module, fileset)
 		err := mlimporter.SetupModule(kibanaClient, module, prefix)
 		if err != nil {

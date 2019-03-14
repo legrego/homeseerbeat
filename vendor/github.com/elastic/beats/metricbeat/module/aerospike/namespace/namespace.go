@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/aerospike"
@@ -52,6 +53,9 @@ type MetricSet struct {
 // configuration entries if needed.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	config := struct{}{}
+
+	cfgwarn.Beta("The aerospike namespace metricset is beta")
+
 	if err := base.Module().UnpackConfig(&config); err != nil {
 		return nil, err
 	}

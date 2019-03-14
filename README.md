@@ -79,10 +79,11 @@ make update
 
 ### Cleanup
 
-To clean  Homeseerbeat source code, run the following command:
+To clean  Homeseerbeat source code, run the following commands:
 
 ```
 make fmt
+make simplify
 ```
 
 To clean up the build directory and generated artifacts, run:

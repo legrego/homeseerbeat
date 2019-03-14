@@ -41,7 +41,6 @@ func TestEventMapping(t *testing.T) {
 
 func TestFetchEventContent(t *testing.T) {
 	absPath, err := filepath.Abs("../_meta/test/")
-	assert.NoError(t, err)
 
 	response, err := ioutil.ReadFile(absPath + "/selfstats.json")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -56,12 +55,11 @@ func TestFetchEventContent(t *testing.T) {
 		"metricsets": []string{"self"},
 		"hosts":      []string{server.URL},
 	}
-	f := mbtest.NewReportingMetricSetV2(t, config)
-	events, errs := mbtest.ReportingFetchV2(f)
-	if len(errs) > 0 {
-		t.Fatalf("Expected 0 error, had %d. %v\n", len(errs), errs)
+	f := mbtest.NewEventFetcher(t, config)
+	event, err := f.Fetch()
+	if err != nil {
+		t.Fatal(err)
 	}
-	assert.NotEmpty(t, events)
 
-	t.Logf("%s/%s event: %+v", f.Module().Name(), f.Name(), events[0])
+	t.Logf("%s/%s event: %+v", f.Module().Name(), f.Name(), event)
 }

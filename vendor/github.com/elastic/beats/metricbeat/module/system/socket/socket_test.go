@@ -20,60 +20,29 @@
 package socket
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/elastic/beats/libbeat/common"
-	sock "github.com/elastic/beats/metricbeat/helper/socket"
 	mbtest "github.com/elastic/beats/metricbeat/mb/testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestData(t *testing.T) {
-	directionIs := func(direction string) func(e common.MapStr) bool {
-		return func(e common.MapStr) bool {
-			v, err := e.GetValue("network.direction")
-			return err == nil && v == direction
-		}
-	}
-
-	dataFiles := []struct {
-		direction string
-		path      string
-	}{
-		{sock.ListeningName, "."},
-		{sock.InboundName, "./_meta/data_inbound.json"},
-		{sock.OutboundName, "./_meta/data_outbound.json"},
-	}
-
-	f := mbtest.NewReportingMetricSetV2(t, getConfig())
-
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer ln.Close()
 
-	for _, df := range dataFiles {
-		c, err := net.Dial("tcp", ln.Addr().String())
-		if err != nil {
-			t.Fatal(err)
-		}
-		c.Close()
+	f := mbtest.NewEventsFetcher(t, getConfig())
 
-		t.Run(fmt.Sprintf("direction:%s", df.direction), func(t *testing.T) {
-			err = mbtest.WriteEventsReporterV2Cond(f, t, df.path, directionIs(df.direction))
-			if err != nil {
-				t.Fatal("write", err)
-			}
-		})
+	if err = mbtest.WriteEvents(f, t); err != nil {
+		t.Fatal("write", err)
 	}
 }
 
@@ -91,27 +60,15 @@ func TestFetch(t *testing.T) {
 		t.Fatal("failed to get port from addr", addr)
 	}
 
-	f := mbtest.NewReportingMetricSetV2(t, getConfig())
-	events, errs := mbtest.ReportingFetchV2(f)
-
-	assert.Empty(t, errs)
-	if !assert.NotEmpty(t, events) {
-		t.FailNow()
+	f := mbtest.NewEventsFetcher(t, getConfig())
+	events, err := f.Fetch()
+	if err != nil {
+		t.Fatal("fetch", err)
 	}
-	t.Logf("%s/%s event: %+v", f.Module().Name(), f.Name(),
-		events[0].BeatEvent("system", "socket").Fields.StringToPrint())
 
 	var found bool
-	for _, event := range events {
-		root := event.BeatEvent("system", "socket").Fields
-
-		s, err := root.GetValue("system.socket")
-		require.NoError(t, err)
-
-		fields, ok := s.(common.MapStr)
-		require.True(t, ok)
-
-		port, ok := getRequiredValue(t, "local.port", fields).(int)
+	for _, evt := range events {
+		port, ok := getRequiredValue("local.port", evt, t).(int)
 		if !ok {
 			t.Fatal("local.port is not an int")
 		}
@@ -119,28 +76,27 @@ func TestFetch(t *testing.T) {
 			continue
 		}
 
-		pid, ok := getRequiredValue(t, "process.pid", root).(int)
+		pid, ok := getRequiredValue("process.pid", evt, t).(int)
 		if !ok {
 			t.Fatal("process.pid is not a int")
 		}
 		assert.Equal(t, os.Getpid(), pid)
 
-		uid, ok := getRequiredValue(t, "user.id", root).(string)
+		uid, ok := getRequiredValue("user.id", evt, t).(uint32)
 		if !ok {
-			t.Fatal("user.id is not a string")
+			t.Fatal("user.id is not an uint32")
 		}
-		assert.EqualValues(t, strconv.Itoa(os.Geteuid()), uid)
+		assert.EqualValues(t, os.Geteuid(), uid)
 
-		dir, ok := getRequiredValue(t, "network.direction", root).(string)
+		dir, ok := getRequiredValue("direction", evt, t).(string)
 		if !ok {
 			t.Fatal("direction is not a string")
 		}
 		assert.Equal(t, "listening", dir)
 
-		_ = getRequiredValue(t, "process.cmdline", fields).(string)
-		_ = getRequiredValue(t, "process.name", root).(string)
-		_ = getRequiredValue(t, "process.executable", root).(string)
-		_ = getRequiredValue(t, "process.args", root).([]string)
+		_ = getRequiredValue("process.cmdline", evt, t).(string)
+		_ = getRequiredValue("process.command", evt, t).(string)
+		_ = getRequiredValue("process.exe", evt, t).(string)
 
 		found = true
 		break
@@ -149,10 +105,10 @@ func TestFetch(t *testing.T) {
 	assert.True(t, found, "listener not found")
 }
 
-func getRequiredValue(t testing.TB, key string, m common.MapStr) interface{} {
+func getRequiredValue(key string, m common.MapStr, t testing.TB) interface{} {
 	v, err := m.GetValue(key)
 	if err != nil {
-		t.Fatal(errors.Wrapf(err, "failed to get value for key '%s'", key))
+		t.Fatal(err)
 	}
 	if v == nil {
 		t.Fatalf("key %v not found in %v", key, m)

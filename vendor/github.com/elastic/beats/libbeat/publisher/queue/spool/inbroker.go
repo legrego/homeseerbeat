@@ -127,9 +127,6 @@ func (b *inBroker) Producer(cfg queue.ProducerConfig) queue.Producer {
 // run in the same go-routine as the Flush was executed from.
 // Only the (*inBroker).eventLoop triggers a flush.
 func (b *inBroker) onFlush(n uint) {
-	log := b.ctx.logger
-	log.Debug("inbroker: onFlush ", n)
-
 	if n == 0 {
 		return
 	}
@@ -382,7 +379,7 @@ func (b *inBroker) stateWithTimer() bool {
 		b.handleCancel(&req)
 
 	case <-b.timer.C:
-		log.Debug("inbroker (stateWithTimer): flush timeout", b.bufferedEvents)
+		log.Debug("inbroker (stateWithTimer): flush timeout")
 
 		b.timer.Stop(true)
 
@@ -397,7 +394,7 @@ func (b *inBroker) stateWithTimer() bool {
 
 		if b.bufferedEvents > 0 {
 			// flush did not push all events? Restart timer.
-			log.Debug("  inbroker (stateWithTimer): start flush timer", b.bufferedEvents)
+			log.Debug("  inbroker (stateWithTimer): start flush timer")
 			b.timer.Start()
 			break
 		}

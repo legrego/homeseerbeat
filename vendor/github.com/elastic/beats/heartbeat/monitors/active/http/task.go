@@ -30,15 +30,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/beats/heartbeat/eventext"
+	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/outputs/transport"
+
 	"github.com/elastic/beats/heartbeat/look"
 	"github.com/elastic/beats/heartbeat/monitors"
 	"github.com/elastic/beats/heartbeat/monitors/active/dialchain"
-	"github.com/elastic/beats/heartbeat/monitors/jobs"
 	"github.com/elastic/beats/heartbeat/reason"
-	"github.com/elastic/beats/libbeat/beat"
-	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/outputs/transport"
 )
 
 func newHTTPMonitorHostJob(
@@ -48,7 +46,9 @@ func newHTTPMonitorHostJob(
 	enc contentEncoder,
 	body []byte,
 	validator RespCheck,
-) (jobs.Job, error) {
+) (monitors.Job, error) {
+	typ := config.Name
+	jobName := fmt.Sprintf("%v@%v", typ, addr)
 
 	client := &http.Client{
 		CheckRedirect: makeCheckRedirect(config.MaxRedirects),
@@ -60,11 +60,29 @@ func newHTTPMonitorHostJob(
 		return nil, err
 	}
 
+	hostname, port, err := splitHostnamePort(request)
+	if err != nil {
+		return nil, err
+	}
+
 	timeout := config.Timeout
 
-	return jobs.MakeSimpleJob(func(event *beat.Event) error {
-		_, _, err := execPing(event, client, request, body, timeout, validator)
-		return err
+	settings := monitors.MakeJobSetting(jobName).WithFields(common.MapStr{
+		"monitor": common.MapStr{
+			"scheme": request.URL.Scheme,
+			"host":   hostname,
+		},
+		"http": common.MapStr{
+			"url": request.URL.String(),
+		},
+		"tcp": common.MapStr{
+			"port": port,
+		},
+	})
+
+	return monitors.MakeSimpleJob(settings, func() (common.MapStr, error) {
+		_, _, event, err := execPing(client, request, body, timeout, validator)
+		return event, err
 	}), nil
 }
 
@@ -75,7 +93,9 @@ func newHTTPMonitorIPsJob(
 	enc contentEncoder,
 	body []byte,
 	validator RespCheck,
-) (jobs.Job, error) {
+) (monitors.Job, error) {
+	typ := config.Name
+	jobName := fmt.Sprintf("%v@%v", typ, addr)
 
 	req, err := buildRequest(addr, config, enc)
 	if err != nil {
@@ -87,27 +107,38 @@ func newHTTPMonitorIPsJob(
 		return nil, err
 	}
 
-	settings := monitors.MakeHostJobSettings(hostname, config.Mode)
+	settings := monitors.MakeHostJobSettings(jobName, hostname, config.Mode)
+	settings = settings.WithFields(common.MapStr{
+		"monitor": common.MapStr{
+			"scheme": req.URL.Scheme,
+		},
+		"http": common.MapStr{
+			"url": req.URL.String(),
+		},
+		"tcp": common.MapStr{
+			"port": port,
+		},
+	})
 
-	pingFactory := createPingFactory(config, port, tls, req, body, validator)
-	job, err := monitors.MakeByHostJob(settings, pingFactory)
-
-	return job, err
+	pingFactory := createPingFactory(config, hostname, port, tls, req, body, validator)
+	return monitors.MakeByHostJob(settings, pingFactory)
 }
 
 func createPingFactory(
 	config *Config,
+	hostname string,
 	port uint16,
 	tls *transport.TLSConfig,
 	request *http.Request,
 	body []byte,
 	validator RespCheck,
-) func(*net.IPAddr) jobs.Job {
+) func(*net.IPAddr) monitors.TaskRunner {
 	timeout := config.Timeout
 	isTLS := request.URL.Scheme == "https"
 	checkRedirect := makeCheckRedirect(config.MaxRedirects)
 
-	return monitors.MakePingIPFactory(func(event *beat.Event, ip *net.IPAddr) error {
+	return monitors.MakePingIPFactory(func(ip *net.IPAddr) (common.MapStr, error) {
+		event := common.MapStr{}
 		addr := net.JoinHostPort(ip.String(), strconv.Itoa(int(port)))
 		d := &dialchain.DialerChain{
 			Net: dialchain.MakeConstAddrDialer(addr, dialchain.TCPDialer(timeout)),
@@ -121,7 +152,7 @@ func createPingFactory(
 
 		dialer, err := d.Build(event)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		var (
@@ -154,12 +185,13 @@ func createPingFactory(
 			},
 		}
 
-		_, end, err := execPing(event, client, request, body, timeout, validator)
+		_, end, result, err := execPing(client, request, body, timeout, validator)
+		event.DeepUpdate(result)
 		cbMutex.Lock()
 		defer cbMutex.Unlock()
 
 		if !readStart.IsZero() {
-			eventext.MergeEventFields(event, common.MapStr{
+			event.DeepUpdate(common.MapStr{
 				"http": common.MapStr{
 					"rtt": common.MapStr{
 						"write_request":   look.RTT(writeEnd.Sub(writeStart)),
@@ -169,11 +201,11 @@ func createPingFactory(
 			})
 		}
 		if !writeStart.IsZero() {
-			event.PutValue("http.rtt.validate", look.RTT(end.Sub(writeStart)))
-			event.PutValue("http.rtt.content", look.RTT(end.Sub(readStart)))
+			event.Put("http.rtt.validate", look.RTT(end.Sub(writeStart)))
+			event.Put("http.rtt.content", look.RTT(end.Sub(readStart)))
 		}
 
-		return err
+		return event, err
 	})
 }
 
@@ -189,11 +221,6 @@ func buildRequest(addr string, config *Config, enc contentEncoder) (*http.Reques
 		request.SetBasicAuth(config.Username, config.Password)
 	}
 	for k, v := range config.Check.Request.SendHeaders {
-		// defining the Host header isn't enough. See https://github.com/golang/go/issues/7682
-		if k == "Host" {
-			request.Host = v
-		}
-
 		request.Header.Add(k, v)
 	}
 
@@ -205,41 +232,28 @@ func buildRequest(addr string, config *Config, enc contentEncoder) (*http.Reques
 }
 
 func execPing(
-	event *beat.Event,
 	client *http.Client,
 	req *http.Request,
 	body []byte,
 	timeout time.Duration,
 	validator func(*http.Response) error,
-) (start, end time.Time, errReason reason.Reason) {
+) (start, end time.Time, event common.MapStr, errReason reason.Reason) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	req = attachRequestBody(&ctx, req, body)
 	start, end, resp, errReason := execRequest(client, req, validator)
 
-	if errReason == nil || errReason.Type() != "io" {
-		eventext.MergeEventFields(event, common.MapStr{"http": common.MapStr{
-			"rtt": common.MapStr{
-				"total": look.RTT(end.Sub(start)),
-			},
-		}})
-	}
-
-	if resp != nil {
-		eventext.MergeEventFields(event, common.MapStr{"http": common.MapStr{
-			"response": common.MapStr{"status_code": resp.StatusCode},
-		}})
-	}
-
 	if errReason != nil {
 		if resp != nil {
-			return start, end, errReason
+			return start, end, makeEvent(end.Sub(start), resp), errReason
 		}
-		return start, end, errReason
+		return start, end, nil, errReason
 	}
 
-	return start, end, nil
+	event = makeEvent(end.Sub(start), resp)
+
+	return start, end, event, nil
 }
 
 func attachRequestBody(ctx *context.Context, req *http.Request, body []byte) *http.Request {
@@ -274,6 +288,17 @@ func execRequest(client *http.Client, req *http.Request, validator func(*http.Re
 	io.Copy(ioutil.Discard, resp.Body)
 
 	return start, time.Now(), resp, nil
+}
+
+func makeEvent(rtt time.Duration, resp *http.Response) common.MapStr {
+	return common.MapStr{"http": common.MapStr{
+		"response": common.MapStr{
+			"status_code": resp.StatusCode,
+		},
+		"rtt": common.MapStr{
+			"total": look.RTT(rtt),
+		},
+	}}
 }
 
 func splitHostnamePort(requ *http.Request) (string, uint16, error) {

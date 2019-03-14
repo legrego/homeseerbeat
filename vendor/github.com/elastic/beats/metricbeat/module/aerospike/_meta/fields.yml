@@ -2,7 +2,7 @@
   title: "Aerospike"
   description: >
     Aerospike module
-  release: ga
+  release: beta
   fields:
     - name: aerospike
       type: group

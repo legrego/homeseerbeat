@@ -96,19 +96,6 @@ func Fields() error {
 	return mage.GenerateFieldsYAML("module")
 }
 
-// FieldsDocs generates docs/fields.asciidoc containing all fields
-// (including x-pack).
-func FieldsDocs() error {
-	inputs := []string{
-		mage.OSSBeatDir("module"),
-	}
-	output := mage.CreateDir("build/fields/fields.all.yml")
-	if err := mage.GenerateFieldsYAMLTo(output, inputs...); err != nil {
-		return err
-	}
-	return mage.Docs.FieldDocs(output)
-}
-
 // GoTestUnit executes the Go unit tests.
 // Use TEST_COVERAGE=true to enable code coverage profiling.
 // Use RACE_DETECTOR=true to enable the race detector.

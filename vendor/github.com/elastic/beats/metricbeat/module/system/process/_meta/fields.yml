@@ -5,25 +5,25 @@
   release: ga
   fields:
     - name: name
-      type: alias
-      path: process.name
-      migration: true
+      type: keyword
+      description: >
+        The process name.
     - name: state
       type: keyword
       description: >
         The process state. For example: "running".
     - name: pid
-      type: alias
-      path: process.pid
-      migration: true
+      type: long
+      description: >
+        The process pid.
     - name: ppid
-      type: alias
-      path: process.ppid
-      migration: true
+      type: long
+      description: >
+        The process parent pid.
     - name: pgid
-      type: alias
-      path: process.pgid
-      migration: true
+      type: long
+      description: >
+        The process group id.
     - name: cmdline
       type: keyword
       description: >
@@ -31,13 +31,17 @@
         arguments separated by space.
       ignore_above: 2048
     - name: username
-      type: alias
-      path: user.name
-      migration: true
+      type: keyword
+      description: >
+        The username of the user that created the process. If the username
+        cannot be determined, the field will contain the user's
+        numeric identifier (UID). On Windows, this field includes the user's
+        domain and is formatted as `domain\username`.
     - name: cwd
-      type: alias
-      path: process.working_directory
-      migration: true
+      type: keyword
+      description: >
+        The current working directory of the process. This field is only
+        available on Linux.
     - name: env
       type: object
       object_type: keyword

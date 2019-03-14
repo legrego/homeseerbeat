@@ -48,10 +48,10 @@ func (mct *memcacheTest) onTransaction(t *transaction) {
 
 func (mct *memcacheTest) genTransaction(requ, resp *message) *transaction {
 	if requ != nil {
-		requ.CmdlineTuple = &common.ProcessTuple{}
+		requ.CmdlineTuple = &common.CmdlineTuple{}
 	}
 	if resp != nil {
-		resp.CmdlineTuple = &common.ProcessTuple{}
+		resp.CmdlineTuple = &common.CmdlineTuple{}
 	}
 
 	t := newTransaction(requ, resp)

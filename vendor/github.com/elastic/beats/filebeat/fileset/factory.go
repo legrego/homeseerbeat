@@ -21,7 +21,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	"github.com/elastic/beats/filebeat/channel"
-	"github.com/elastic/beats/filebeat/input"
+	input "github.com/elastic/beats/filebeat/prospector"
 	"github.com/elastic/beats/filebeat/registrar"
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/cfgfile"

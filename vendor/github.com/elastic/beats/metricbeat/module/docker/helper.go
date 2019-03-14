@@ -35,18 +35,13 @@ type Container struct {
 
 func (c *Container) ToMapStr() common.MapStr {
 	m := common.MapStr{
-		"container": common.MapStr{
-			"id":   c.ID,
-			"name": c.Name,
-			"image": common.MapStr{
-				"name": c.Image,
-			},
-			"runtime": "docker",
-		},
+		"id":    c.ID,
+		"name":  c.Name,
+		"image": c.Image,
 	}
 
 	if len(c.Labels) > 0 {
-		m.Put("docker.container.labels", c.Labels)
+		m["labels"] = c.Labels
 	}
 	return m
 }

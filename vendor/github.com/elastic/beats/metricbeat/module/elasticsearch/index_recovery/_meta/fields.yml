@@ -2,7 +2,7 @@
   type: group
   description: >
     index
-  release: ga
+  release: beta
   fields:
     - name: id
       type: long
@@ -26,9 +26,9 @@
       description: >
         Target node id.
     - name: target.host
-      type: keyword
+      type: ip
       description: >
-        Target node host address (could be IP address or hostname).
+        Target node host address.
     - name: target.name
       type: keyword
       description: >
@@ -39,9 +39,9 @@
       description: >
         Source node id.
     - name: source.host
-      type: keyword
+      type: ip
       description: >
-        Source node host address (could be IP address or hostname).
+        Source node host address.
     - name: source.name
       type: keyword
       description: >

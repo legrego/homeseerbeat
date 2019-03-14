@@ -25,7 +25,6 @@ import (
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
-	"github.com/elastic/beats/libbeat/outputs"
 	"github.com/elastic/beats/libbeat/publisher/pipeline"
 )
 
@@ -58,19 +57,13 @@ func RunTests(
 		return fmt.Errorf("unpacking config failed: %v", err)
 	}
 
-	pipeline, err := pipeline.Load(info,
-		pipeline.Monitors{
-			Metrics:   nil,
-			Telemetry: nil,
-			Logger:    logp.L(),
-		},
+	pipeline, err := pipeline.Load(info, pipeline.Monitors{
+		Metrics:   nil,
+		Telemetry: nil,
+		Logger:    logp.L(),
+	},
 		config.Pipeline,
-		func(stat outputs.Observer) (string, outputs.Group, error) {
-			cfg := config.Output
-			out, err := outputs.Load(nil, info, stat, cfg.Name(), cfg.Config())
-			return cfg.Name(), out, err
-		},
-	)
+		config.Output)
 	if err != nil {
 		return fmt.Errorf("loading pipeline failed: %+v", err)
 	}

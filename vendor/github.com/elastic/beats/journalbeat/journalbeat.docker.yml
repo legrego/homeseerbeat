@@ -1,6 +1,6 @@
 journalbeat.inputs:
 - paths: []
-  seek: cursor
+  seek: tail
 
 processors:
 - add_cloud_metadata: ~

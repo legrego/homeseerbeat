@@ -22,20 +22,24 @@ package memory
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	mbtest "github.com/elastic/beats/metricbeat/mb/testing"
 )
 
-func TestData(t *testing.T) {
-	f := mbtest.NewReportingMetricSetV2(t, getConfig())
-	events, errs := mbtest.ReportingFetchV2(f)
-	if len(errs) > 0 {
-		t.Fatalf("Expected 0 error, had %d. %v\n", len(errs), errs)
+/*
+// TODO: Enable
+func TestFetch(t *testing.T) {
+	f := mbtest.NewEventsFetcher(t, getConfig())
+	event, err := f.Fetch()
+	if err != nil {
+		t.Fatal(err)
 	}
-	assert.NotEmpty(t, events)
+	t.Logf(" module : %s metricset : %s event: %+v", f.Module().Name(), f.Name(), event)
+}*/
 
-	if err := mbtest.WriteEventsReporterV2(f, t, ""); err != nil {
+func TestData(t *testing.T) {
+	f := mbtest.NewEventsFetcher(t, getConfig())
+	err := mbtest.WriteEvents(f, t)
+	if err != nil {
 		t.Fatal("write", err)
 	}
 }

@@ -18,8 +18,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"go/format"
 	"io/ioutil"
 	"os"
 	"path"
@@ -60,7 +62,22 @@ func main() {
 			os.Exit(1)
 		}
 
-		bs, err := asset.CreateAsset(licenses.ASL2, "metricbeat", module, module, data, "asset.ModuleFieldsPri", dir+"/"+module)
+		encData, err := asset.EncodeData(string(data))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error encoding the data: %s\n", err)
+			os.Exit(1)
+		}
+
+		var buf bytes.Buffer
+		asset.Template.Execute(&buf, asset.Data{
+			License: licenses.ASL2,
+			Beat:    "metricbeat",
+			Name:    module,
+			Data:    encData,
+			Package: module,
+		})
+
+		bs, err := format.Source(buf.Bytes())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating golang file from template: %s\n", err)
 			os.Exit(1)

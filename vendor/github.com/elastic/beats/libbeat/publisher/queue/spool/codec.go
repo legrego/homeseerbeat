@@ -24,7 +24,6 @@ import (
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/outputs/codec"
 	"github.com/elastic/beats/libbeat/publisher"
 	"github.com/elastic/go-structform"
 	"github.com/elastic/go-structform/cborl"
@@ -96,12 +95,7 @@ func (e *encoder) reset() {
 		panic("no codec configured")
 	}
 
-	folder, err := gotype.NewIterator(visitor,
-		gotype.Folders(
-			codec.MakeTimestampEncoder(),
-			codec.MakeBCTimestampEncoder(),
-		),
-	)
+	folder, err := gotype.NewIterator(visitor)
 	if err != nil {
 		panic(err)
 	}

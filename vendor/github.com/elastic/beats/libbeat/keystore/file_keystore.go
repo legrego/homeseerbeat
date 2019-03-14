@@ -234,53 +234,41 @@ func (k *FileKeystore) doSave(override bool) error {
 	return nil
 }
 
-func (k *FileKeystore) loadRaw() ([]byte, error) {
+func (k *FileKeystore) load() error {
+	k.Lock()
+	defer k.Unlock()
+
 	f, err := os.OpenFile(k.Path, os.O_RDONLY, filePermission)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return nil
 		}
-		return nil, err
+		return err
 	}
 	defer f.Close()
 
 	if common.IsStrictPerms() {
 		if err := k.checkPermissions(k.Path); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	raw, err := ioutil.ReadAll(f)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	v := raw[0:len(version)]
 	if !bytes.Equal(v, version) {
-		return nil, fmt.Errorf("keystore format doesn't match expected version: '%s' got '%s'", version, v)
+		return fmt.Errorf("keystore format doesn't match expected version: '%s' got '%s'", version, v)
 	}
 
-	if len(raw) <= len(version) {
-		return nil, fmt.Errorf("corrupt or empty keystore")
+	base64Content := raw[len(version):]
+	if len(base64Content) == 0 {
+		return fmt.Errorf("corrupt or empty keystore")
 	}
 
-	return raw, nil
-}
-
-func (k *FileKeystore) load() error {
-	k.Lock()
-	defer k.Unlock()
-
-	raw, err := k.loadRaw()
-	if err != nil {
-		return err
-	}
-
-	if len(raw) == 0 {
-		return nil
-	}
-
-	base64Decoder := base64.NewDecoder(base64.StdEncoding, bytes.NewReader(raw[len(version):]))
+	base64Decoder := base64.NewDecoder(base64.StdEncoding, bytes.NewReader(base64Content))
 	plaintext, err := k.decrypt(base64Decoder)
 	if err != nil {
 		return fmt.Errorf("could not decrypt the keystore: %v", err)
@@ -406,13 +394,6 @@ func (k *FileKeystore) checkPermissions(f string) error {
 	}
 
 	return nil
-}
-
-// Package returns the bytes of the encrypted keystore.
-func (k *FileKeystore) Package() ([]byte, error) {
-	k.Lock()
-	defer k.Unlock()
-	return k.loadRaw()
 }
 
 func (k *FileKeystore) hashPassword(password, salt []byte) []byte {

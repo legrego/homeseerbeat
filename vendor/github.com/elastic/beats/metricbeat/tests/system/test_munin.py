@@ -18,7 +18,7 @@ class Test(metricbeat.BaseTest):
             "hosts": self.get_hosts(),
             "period": "1s",
             "extras": {
-                "munin.plugins": ["cpu"],
+                "node.namespace": namespace,
             },
         }])
         proc = self.start_beat()
@@ -31,12 +31,8 @@ class Test(metricbeat.BaseTest):
         evt = output[0]
         print(evt)
 
-        assert evt["service"]["type"] == "cpu"
-        assert evt["munin"]["plugin"]["name"] == "cpu"
-        assert evt["munin"]["metrics"]["user"] > 0
-
-        self.assert_fields_are_documented(evt)
+        assert evt["munin"][namespace]["cpu"]["user"] > 0
 
     def get_hosts(self):
-        return [self.compose_hosts()[0] + ':' +
+        return [os.getenv('MUNIN_HOST', 'localhost') + ':' +
                 os.getenv('MUNIN_PORT', '4949')]

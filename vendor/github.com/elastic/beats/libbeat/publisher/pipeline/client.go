@@ -22,7 +22,6 @@ import (
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common/atomic"
-	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/publisher"
 	"github.com/elastic/beats/libbeat/publisher/queue"
 )
@@ -68,7 +67,7 @@ func (c *client) publish(e beat.Event) {
 	var (
 		event   = &e
 		publish = true
-		log     = c.pipeline.monitors.Logger
+		log     = c.pipeline.logger
 	)
 
 	c.onNewEvent()
@@ -138,7 +137,7 @@ func (c *client) Close() error {
 	// first stop ack handling. ACK handler might block (with timeout), waiting
 	// for pending events to be ACKed.
 
-	log := c.logger()
+	log := c.pipeline.logger
 
 	if !c.isOpen.Swap(false) {
 		return nil // closed or already closing
@@ -163,10 +162,6 @@ func (c *client) Close() error {
 
 	c.onClosed()
 	return nil
-}
-
-func (c *client) logger() *logp.Logger {
-	return c.pipeline.monitors.Logger
 }
 
 func (c *client) onClosing() {
@@ -195,9 +190,6 @@ func (c *client) onPublished() {
 }
 
 func (c *client) onFilteredOut(e beat.Event) {
-	log := c.logger()
-
-	log.Debug("Pipeline client receives callback 'onFilteredOut' for event: %+v", e)
 	c.pipeline.observer.filteredEvent()
 	if c.eventer != nil {
 		c.eventer.FilteredOut(e)
@@ -205,9 +197,6 @@ func (c *client) onFilteredOut(e beat.Event) {
 }
 
 func (c *client) onDroppedOnPublish(e beat.Event) {
-	log := c.logger()
-
-	log.Debug("Pipeline client receives callback 'onDroppedOnPublish' for event: %+v", e)
 	c.pipeline.observer.failedPublishEvent()
 	if c.eventer != nil {
 		c.eventer.DroppedOnPublish(e)

@@ -27,8 +27,7 @@ This file is generated! See scripts/docs_collector.py
     for path in base_paths:
         module_dir = os.path.join(path, "module")
         for module_name in os.listdir(module_dir):
-            if os.path.isdir(os.path.join(module_dir, module_name)):
-                module_dirs[module_name] = os.path.join(module_dir, module_name)
+            module_dirs[module_name] = os.path.join(module_dir, module_name)
 
     # Iterate over all modules
     for module in sorted(module_dirs):

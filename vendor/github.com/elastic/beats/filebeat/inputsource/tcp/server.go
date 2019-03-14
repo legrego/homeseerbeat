@@ -48,24 +48,25 @@ type Server struct {
 // New creates a new tcp server
 func New(
 	config *Config,
-	splitFunc bufio.SplitFunc,
 	callback inputsource.NetworkFunc,
 ) (*Server, error) {
+
+	if len(config.LineDelimiter) == 0 {
+		return nil, fmt.Errorf("empty line delimiter")
+	}
+
 	tlsConfig, err := tlscommon.LoadTLSServerConfig(config.TLS)
 	if err != nil {
 		return nil, err
 	}
 
-	if splitFunc == nil {
-		return nil, fmt.Errorf("SplitFunc can't be empty")
-	}
-
+	sf := splitFunc([]byte(config.LineDelimiter))
 	return &Server{
 		config:    config,
 		callback:  callback,
 		clients:   make(map[*client]struct{}, 0),
 		done:      make(chan struct{}),
-		splitFunc: splitFunc,
+		splitFunc: sf,
 		log:       logp.NewLogger("tcp").With("address", config.Host),
 		tlsConfig: tlsConfig,
 	}, nil
@@ -189,8 +190,7 @@ func (s *Server) clientsCount() int {
 	return len(s.clients)
 }
 
-// SplitFunc allows to create a `bufio.SplitFunc` based on a delimiter provided.
-func SplitFunc(lineDelimiter []byte) bufio.SplitFunc {
+func splitFunc(lineDelimiter []byte) bufio.SplitFunc {
 	ld := []byte(lineDelimiter)
 	if bytes.Equal(ld, []byte("\n")) {
 		// This will work for most usecases and will also strip \r if present.

@@ -2,7 +2,7 @@
   type: group
   description: >
     Kubernetes API server metrics
-  release: ga
+  release: beta
   fields:
     - name: request.client
       type: keyword

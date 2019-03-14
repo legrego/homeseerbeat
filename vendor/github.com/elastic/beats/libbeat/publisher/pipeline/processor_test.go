@@ -22,38 +22,33 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/logp"
 )
 
 func TestProcessors(t *testing.T) {
-	defaultInfo := beat.Info{}
+	info := beat.Info{}
 
 	type local struct {
-		config               beat.ClientConfig
-		events               []common.MapStr
-		expected             []common.MapStr
-		includeAgentMetadata bool
-		includeHostName      bool
+		config   beat.ClientConfig
+		events   []common.MapStr
+		expected []common.MapStr
 	}
 
 	tests := []struct {
 		name   string
 		global pipelineProcessors
 		local  []local
-		info   *beat.Info
 	}{
 		{
-			name: "user global fields and tags",
-			global: pipelineProcessors{
+			"user global fields and tags",
+			pipelineProcessors{
 				fields: common.MapStr{"global": 1},
 				tags:   []string{"tag"},
 			},
-			local: []local{
+			[]local{
 				{
 					config: beat.ClientConfig{},
 					events: []common.MapStr{{"value": "abc", "user": nil}},
@@ -64,12 +59,12 @@ func TestProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "no normalization",
-			global: pipelineProcessors{
+			"no normalization",
+			pipelineProcessors{
 				fields: common.MapStr{"global": 1},
 				tags:   []string{"tag"},
 			},
-			local: []local{
+			[]local{
 				{
 					config: beat.ClientConfig{SkipNormalization: true},
 					events: []common.MapStr{{"value": "abc", "user": nil}},
@@ -80,124 +75,9 @@ func TestProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "add agent metadata",
-			global: pipelineProcessors{
-				fields: common.MapStr{"global": 1, "agent": common.MapStr{"foo": "bar"}},
-				tags:   []string{"tag"},
-			},
-			info: &beat.Info{
-				Beat:        "test",
-				EphemeralID: uuid.Must(uuid.FromString("123e4567-e89b-12d3-a456-426655440000")),
-				Hostname:    "test.host.name",
-				ID:          uuid.Must(uuid.FromString("123e4567-e89b-12d3-a456-426655440001")),
-				Name:        "test.host.name",
-				Version:     "0.1",
-			},
-			local: []local{
-				{
-					config: beat.ClientConfig{},
-					events: []common.MapStr{{"value": "abc", "user": nil}},
-					expected: []common.MapStr{
-						{
-							"agent": common.MapStr{
-								"ephemeral_id": "123e4567-e89b-12d3-a456-426655440000",
-								"hostname":     "test.host.name",
-								"id":           "123e4567-e89b-12d3-a456-426655440001",
-								"type":         "test",
-								"version":      "0.1",
-								"foo":          "bar",
-							},
-							"value": "abc", "global": 1, "tags": []string{"tag"},
-						},
-					},
-					includeAgentMetadata: true,
-				},
-			},
-		},
-		{
-			name: "add agent metadata with custom host.name",
-			global: pipelineProcessors{
-				fields: common.MapStr{"global": 1},
-				tags:   []string{"tag"},
-			},
-			info: &beat.Info{
-				Beat:        "test",
-				EphemeralID: uuid.Must(uuid.FromString("123e4567-e89b-12d3-a456-426655440000")),
-				Hostname:    "test.host.name",
-				ID:          uuid.Must(uuid.FromString("123e4567-e89b-12d3-a456-426655440001")),
-				Name:        "other.test.host.name",
-				Version:     "0.1",
-			},
-			local: []local{
-				{
-					config: beat.ClientConfig{},
-					events: []common.MapStr{{"value": "abc", "user": nil}},
-					expected: []common.MapStr{
-						{
-							"agent": common.MapStr{
-								"ephemeral_id": "123e4567-e89b-12d3-a456-426655440000",
-								"hostname":     "test.host.name",
-								"id":           "123e4567-e89b-12d3-a456-426655440001",
-								"name":         "other.test.host.name",
-								"type":         "test",
-								"version":      "0.1",
-							},
-							"value": "abc", "global": 1, "tags": []string{"tag"},
-						},
-					},
-					includeAgentMetadata: true,
-				},
-			},
-		},
-		{
-			name: "add host name",
-			global: pipelineProcessors{
-				fields: common.MapStr{"global": 1, "host": common.MapStr{"name": "host123"}},
-			},
-			info: &beat.Info{
-				Hostname: "test.host.hostname",
-				Name:     "test.host.name",
-			},
-			local: []local{
-				{
-					config: beat.ClientConfig{},
-					events: []common.MapStr{{"value": "abc"}},
-					expected: []common.MapStr{
-						{
-							"host":  common.MapStr{"name": "test.host.name"},
-							"value": "abc", "global": 1,
-						},
-					},
-					includeHostName: true,
-				},
-			},
-		},
-		{
-			name: "add host name to existing host",
-			global: pipelineProcessors{
-				fields: common.MapStr{"global": 1, "host": common.MapStr{"name": "host123"}},
-			},
-			info: &beat.Info{
-				Hostname: "test.host.hostname",
-				Name:     "test.host.name",
-			},
-			local: []local{
-				{
-					config: beat.ClientConfig{},
-					events: []common.MapStr{{"value": "abc", "host": common.MapStr{"hostname": "test.other.hostname"}}},
-					expected: []common.MapStr{
-						{
-							"host":  common.MapStr{"name": "test.host.name", "hostname": "test.other.hostname"},
-							"value": "abc", "global": 1,
-						},
-					},
-					includeHostName: true,
-				},
-			},
-		},
-		{
-			name: "beat local fields",
-			local: []local{
+			"beat local fields",
+			pipelineProcessors{},
+			[]local{
 				{
 					config: beat.ClientConfig{
 						Fields: common.MapStr{"local": 1},
@@ -208,12 +88,12 @@ func TestProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "beat local and user global fields",
-			global: pipelineProcessors{
+			"beat local and user global fields",
+			pipelineProcessors{
 				fields: common.MapStr{"global": 1},
 				tags:   []string{"tag"},
 			},
-			local: []local{
+			[]local{
 				{
 					config: beat.ClientConfig{
 						Fields: common.MapStr{"local": 1},
@@ -226,12 +106,12 @@ func TestProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "user global fields overwrite beat local fields",
-			global: pipelineProcessors{
+			"user global fields overwrite beat local fields",
+			pipelineProcessors{
 				fields: common.MapStr{"global": 1, "shared": "global"},
 				tags:   []string{"tag"},
 			},
-			local: []local{
+			[]local{
 				{
 					config: beat.ClientConfig{
 						Fields: common.MapStr{"local": 1, "shared": "local"},
@@ -244,8 +124,9 @@ func TestProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "beat local fields isolated",
-			local: []local{
+			"beat local fields isolated",
+			pipelineProcessors{},
+			[]local{
 				{
 					config: beat.ClientConfig{
 						Fields: common.MapStr{"local": 1},
@@ -264,11 +145,11 @@ func TestProcessors(t *testing.T) {
 		},
 
 		{
-			name: "beat local fields + user global fields isolated",
-			global: pipelineProcessors{
+			"beat local fields + user global fields isolated",
+			pipelineProcessors{
 				fields: common.MapStr{"global": 0},
 			},
-			local: []local{
+			[]local{
 				{
 					config: beat.ClientConfig{
 						Fields: common.MapStr{"local": 1},
@@ -286,8 +167,9 @@ func TestProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "user local fields and tags",
-			local: []local{
+			"user local fields and tags",
+			pipelineProcessors{},
+			[]local{
 				{
 					config: beat.ClientConfig{
 						EventMetadata: common.EventMetadata{
@@ -303,8 +185,9 @@ func TestProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "user local fields (under root) and tags",
-			local: []local{
+			"user local fields (under root) and tags",
+			pipelineProcessors{},
+			[]local{
 				{
 					config: beat.ClientConfig{
 						EventMetadata: common.EventMetadata{
@@ -321,12 +204,12 @@ func TestProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "user local fields overwrite user global fields",
-			global: pipelineProcessors{
+			"user local fields overwrite user global fields",
+			pipelineProcessors{
 				fields: common.MapStr{"global": 0, "shared": "global"},
 				tags:   []string{"global"},
 			},
-			local: []local{
+			[]local{
 				{
 					config: beat.ClientConfig{
 						EventMetadata: common.EventMetadata{
@@ -347,8 +230,9 @@ func TestProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "user local fields isolated",
-			local: []local{
+			"user local fields isolated",
+			pipelineProcessors{},
+			[]local{
 				{
 					config: beat.ClientConfig{
 						EventMetadata: common.EventMetadata{
@@ -370,11 +254,11 @@ func TestProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "user local + global fields isolated",
-			global: pipelineProcessors{
+			"user local + global fields isolated",
+			pipelineProcessors{
 				fields: common.MapStr{"fields": common.MapStr{"global": 0}},
 			},
-			local: []local{
+			[]local{
 				{
 					config: beat.ClientConfig{
 						EventMetadata: common.EventMetadata{
@@ -396,11 +280,11 @@ func TestProcessors(t *testing.T) {
 			},
 		},
 		{
-			name: "user local + global fields isolated (fields with root)",
-			global: pipelineProcessors{
+			"user local + global fields isolated (fields with root)",
+			pipelineProcessors{
 				fields: common.MapStr{"global": 0},
 			},
-			local: []local{
+			[]local{
 				{
 					config: beat.ClientConfig{
 						EventMetadata: common.EventMetadata{
@@ -428,20 +312,10 @@ func TestProcessors(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			monitors := Monitors{
-				Logger: logp.NewLogger("test processors"),
-			}
-
 			// create processor pipelines
 			programs := make([]beat.Processor, len(test.local))
-			info := defaultInfo
-			if test.info != nil {
-				info = *test.info
-			}
 			for i, local := range test.local {
-				local.config.SkipAgentMetadata = !local.includeAgentMetadata
-				local.config.SkipHostName = !local.includeHostName
-				programs[i] = newProcessorPipeline(info, monitors, test.global, local.config)
+				programs[i] = newProcessorPipeline(info, test.global, local.config)
 			}
 
 			// run processor pipelines in parallel

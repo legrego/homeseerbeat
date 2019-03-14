@@ -57,11 +57,9 @@ type Decoder struct {
 	tcpProc   tcp.Processor
 	udpProc   udp.Processor
 
-	flows          *flows.Flows
-	statPackets    *flows.Uint
-	statBytes      *flows.Uint
-	icmpV4TypeCode *flows.Uint
-	icmpV6TypeCode *flows.Uint
+	flows       *flows.Flows
+	statPackets *flows.Uint
+	statBytes   *flows.Uint
 
 	// hold current flow ID
 	flowID              *flows.FlowID // buffer flowID among many calls
@@ -69,10 +67,8 @@ type Decoder struct {
 }
 
 const (
-	netPacketsTotalCounter = "packets"
-	netBytesTotalCounter   = "bytes"
-	icmpV4TypeCodeValue    = "icmpV4TypeCode"
-	icmpV6TypeCodeValue    = "icmpV6TypeCode"
+	netPacketsTotalCounter = "net_packets_total"
+	netBytesTotalCounter   = "net_bytes_total"
 )
 
 // New creates and initializes a new packet decoder.
@@ -102,15 +98,6 @@ func New(
 		if err != nil {
 			return nil, err
 		}
-		d.icmpV4TypeCode, err = f.NewUint(icmpV4TypeCodeValue)
-		if err != nil {
-			return nil, err
-		}
-		d.icmpV6TypeCode, err = f.NewUint(icmpV6TypeCodeValue)
-		if err != nil {
-			return nil, err
-		}
-
 		d.flowID = &flows.FlowID{}
 	}
 
@@ -293,11 +280,6 @@ func (d *Decoder) process(
 }
 
 func (d *Decoder) onICMPv4(packet *protos.Packet) {
-	if d.flowID != nil {
-		flow := d.flows.Get(d.flowID)
-		d.icmpV4TypeCode.Set(flow, uint64(d.icmp4.TypeCode))
-	}
-
 	if d.icmp4Proc != nil {
 		packet.Payload = d.icmp4.Payload
 		packet.Tuple.ComputeHashables()
@@ -306,11 +288,6 @@ func (d *Decoder) onICMPv4(packet *protos.Packet) {
 }
 
 func (d *Decoder) onICMPv6(packet *protos.Packet) {
-	if d.flowID != nil {
-		flow := d.flows.Get(d.flowID)
-		d.icmpV6TypeCode.Set(flow, uint64(d.icmp6.TypeCode))
-	}
-
 	if d.icmp6Proc != nil {
 		packet.Payload = d.icmp6.Payload
 		packet.Tuple.ComputeHashables()

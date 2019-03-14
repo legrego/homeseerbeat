@@ -35,7 +35,7 @@ type redisMessage struct {
 	ts time.Time
 
 	tcpTuple     common.TCPTuple
-	cmdlineTuple *common.ProcessTuple
+	cmdlineTuple *common.CmdlineTuple
 	direction    uint8
 
 	isRequest bool

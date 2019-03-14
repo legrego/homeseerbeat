@@ -45,11 +45,6 @@ type Monitors struct {
 	Logger    *logp.Logger
 }
 
-// OutputFactory is used by the publisher pipeline to create an output instance.
-// If the group returned can be empty. The pipeline will accept events, but
-// eventually block.
-type OutputFactory func(outputs.Observer) (string, outputs.Group, error)
-
 func init() {
 	flag.BoolVar(&publishDisabled, "N", false, "Disable actual publishing for testing")
 }
@@ -60,7 +55,7 @@ func Load(
 	beatInfo beat.Info,
 	monitors Monitors,
 	config Config,
-	makeOutput func(outputs.Observer) (string, outputs.Group, error),
+	outcfg common.ConfigNamespace,
 ) (*Pipeline, error) {
 	log := monitors.Logger
 	if log == nil {
@@ -85,8 +80,13 @@ func Load(
 		Annotations: Annotations{
 			Event: config.EventMetadata,
 			Builtin: common.MapStr{
-				"ecs": common.MapStr{
-					"version": "1.0.0-beta2",
+				"beat": common.MapStr{
+					"name":     name,
+					"hostname": beatInfo.Hostname,
+					"version":  beatInfo.Version,
+				},
+				"host": common.MapStr{
+					"name": name,
 				},
 			},
 		},
@@ -97,12 +97,12 @@ func Load(
 		return nil, err
 	}
 
-	out, err := loadOutput(monitors, makeOutput)
+	out, err := loadOutput(beatInfo, monitors, outcfg)
 	if err != nil {
 		return nil, err
 	}
 
-	p, err := New(beatInfo, monitors, queueBuilder, out, settings)
+	p, err := New(beatInfo, monitors, monitors.Metrics, queueBuilder, out, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -112,8 +112,9 @@ func Load(
 }
 
 func loadOutput(
+	beatInfo beat.Info,
 	monitors Monitors,
-	makeOutput OutputFactory,
+	outcfg common.ConfigNamespace,
 ) (outputs.Group, error) {
 	log := monitors.Logger
 	if log == nil {
@@ -124,7 +125,7 @@ func loadOutput(
 		return outputs.Group{}, nil
 	}
 
-	if makeOutput == nil {
+	if !outcfg.IsSet() {
 		return outputs.Group{}, nil
 	}
 
@@ -142,13 +143,13 @@ func loadOutput(
 		outStats = outputs.NewStats(metrics)
 	}
 
-	outName, out, err := makeOutput(outStats)
+	out, err := outputs.Load(beatInfo, outStats, outcfg.Name(), outcfg.Config())
 	if err != nil {
 		return outputs.Fail(err)
 	}
 
 	if metrics != nil {
-		monitoring.NewString(metrics, "type").Set(outName)
+		monitoring.NewString(metrics, "type").Set(outcfg.Name())
 	}
 	if monitors.Telemetry != nil {
 		telemetry := monitors.Telemetry.GetRegistry("output")
@@ -157,7 +158,7 @@ func loadOutput(
 		} else {
 			telemetry = monitors.Telemetry.NewRegistry("output")
 		}
-		monitoring.NewString(telemetry, "name").Set(outName)
+		monitoring.NewString(telemetry, "name").Set(outcfg.Name())
 	}
 
 	return out, nil

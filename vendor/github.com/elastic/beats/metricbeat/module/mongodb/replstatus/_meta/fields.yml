@@ -1,6 +1,5 @@
 - name: replstatus
   type: group
-  release: ga
   description: >
     replstatus provides an overview of replica set status.
   fields:
@@ -107,7 +106,7 @@
           description: >
             Optime of primary
         - name: secondary.hosts
-          type: keyword
+          type: array
           description: >
             List of secondary hosts
         - name: secondary.optimes
@@ -119,7 +118,7 @@
           descriprtion: >
             Count of secondaries
         - name: recovering.hosts
-          type: keyword
+          type: array
           description: >
             List of recovering members hosts
         - name: recovering.count
@@ -127,7 +126,7 @@
           description: >
             Count of members in the `recovering` state
         - name: unknown.hosts
-          type: keyword
+          type: array
           description: >
             List of members' hosts in the `unknown` state
         - name: unknown.count
@@ -135,7 +134,7 @@
           description: >
             Count of members with `unknown` state
         - name: startup2.hosts
-          type: keyword
+          type: array
           description: >
             List of initializing members hosts
         - name: startup2.count
@@ -143,7 +142,7 @@
           description: >
             Count of members in the `startup2` state
         - name: arbiter.hosts
-          type: keyword
+          type: array
           description: >
             List of arbiters hosts
         - name: arbiter.count
@@ -151,7 +150,7 @@
           description: >
             Count of arbiters
         - name: down.hosts
-          type: keyword
+          type: array
           description: >
             List of `down` members hosts
         - name: down.count
@@ -159,7 +158,7 @@
           description: >
             Count of `down` members
         - name: rollback.hosts
-          type: keyword
+          type: array
           description: >
             List of members in the `rollback` state
         - name: rollback.count
@@ -167,7 +166,7 @@
           description: >
             Count of members in the `rollback` state
         - name: unhealthy.hosts
-          type: keyword
+          type: array
           description: >
             List of members' hosts with healthy = false
         - name: unhealthy.count

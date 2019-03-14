@@ -77,16 +77,14 @@ func TestRetrieveOpenstackNovaMetadata(t *testing.T) {
 	}
 
 	expected := common.MapStr{
-		"cloud": common.MapStr{
-			"provider": "openstack",
-			"instance": common.MapStr{"" +
-				"id": "i-0000ffac",
-				"name": "testvm01.stack.cloud",
+		"meta": common.MapStr{
+			"cloud": common.MapStr{
+				"provider":          "openstack",
+				"instance_id":       "i-0000ffac",
+				"instance_name":     "testvm01.stack.cloud",
+				"machine_type":      "m1.xlarge",
+				"availability_zone": "az-test-2",
 			},
-			"machine": common.MapStr{
-				"type": "m1.xlarge",
-			},
-			"availability_zone": "az-test-2",
 		},
 	}
 	assert.Equal(t, expected, actual.Fields)

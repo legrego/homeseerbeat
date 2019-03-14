@@ -59,20 +59,18 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 }
 
 // Fetch fetches disk IO metrics from the OS.
-func (m *MetricSet) Fetch(r mb.ReporterV2) {
+func (m *MetricSet) Fetch() ([]common.MapStr, error) {
 	stats, err := disk.IOCounters(m.includeDevices...)
 	if err != nil {
-		r.Error(errors.Wrap(err, "disk io counters"))
-		return
+		return nil, errors.Wrap(err, "disk io counters")
 	}
 
-	// Sample the current cpu counter
+	// open a sampling means sample the current cpu counter
 	m.statistics.OpenSampling()
 
-	// Store the last cpu counter when finished
-	defer m.statistics.CloseSampling()
-
+	events := make([]common.MapStr, 0, len(stats))
 	for _, counters := range stats {
+
 		event := common.MapStr{
 			"name": counters.Name,
 			"read": common.MapStr{
@@ -125,12 +123,15 @@ func (m *MetricSet) Fetch(r mb.ReporterV2) {
 			}
 		}
 
+		events = append(events, event)
+
 		if counters.SerialNumber != "" {
 			event["serial_number"] = counters.SerialNumber
 		}
-
-		r.Event(mb.Event{
-			MetricSetFields: event,
-		})
 	}
+
+	// open a sampling means store the last cpu counter
+	m.statistics.CloseSampling()
+
+	return events, nil
 }

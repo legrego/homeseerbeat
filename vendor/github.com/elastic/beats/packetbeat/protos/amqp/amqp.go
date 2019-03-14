@@ -22,11 +22,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/monitoring"
 
-	"github.com/elastic/beats/packetbeat/pb"
 	"github.com/elastic/beats/packetbeat/protos"
 	"github.com/elastic/beats/packetbeat/protos/tcp"
 )
@@ -323,7 +323,7 @@ func (amqp *amqpPlugin) handleAmqpResponse(msg *amqpMessage) {
 		trans.method = "basic.get-empty"
 	}
 
-	trans.endTime = msg.ts
+	trans.responseTime = int32(msg.ts.Sub(trans.ts).Nanoseconds() / 1e6)
 	trans.notes = msg.notes
 
 	amqp.publishTransaction(trans)
@@ -427,28 +427,21 @@ func (amqp *amqpPlugin) publishTransaction(t *amqpTransaction) {
 		return
 	}
 
-	evt, pbf := pb.NewBeatEvent(t.ts)
-	pbf.SetSource(&t.src)
-	pbf.SetDestination(&t.dst)
-	pbf.Source.Bytes = int64(t.bytesIn)
-	pbf.Destination.Bytes = int64(t.bytesOut)
-	pbf.Event.Start = t.ts
-	pbf.Event.End = t.endTime
-	pbf.Event.Dataset = "amqp"
-	pbf.Network.Protocol = pbf.Event.Dataset
-	pbf.Network.Transport = "tcp"
-	pbf.Error.Message = t.notes
+	fields := common.MapStr{}
+	fields["type"] = "amqp"
 
-	fields := evt.Fields
-	fields["type"] = pbf.Event.Dataset
 	fields["method"] = t.method
-
 	if isError(t) {
 		fields["status"] = common.ERROR_STATUS
 	} else {
 		fields["status"] = common.OK_STATUS
 	}
+	fields["responsetime"] = t.responseTime
 	fields["amqp"] = t.amqp
+	fields["bytes_out"] = t.bytesOut
+	fields["bytes_in"] = t.bytesIn
+	fields["src"] = &t.src
+	fields["dst"] = &t.dst
 
 	//let's try to convert request/response to a readable format
 	if amqp.sendRequest {
@@ -490,8 +483,14 @@ func (amqp *amqpPlugin) publishTransaction(t *amqpTransaction) {
 			fields["response"] = t.response
 		}
 	}
+	if len(t.notes) > 0 {
+		fields["notes"] = t.notes
+	}
 
-	amqp.results(evt)
+	amqp.results(beat.Event{
+		Timestamp: t.ts,
+		Fields:    fields,
+	})
 }
 
 //function to check if method is async or not

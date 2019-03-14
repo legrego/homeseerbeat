@@ -1,13 +1,8 @@
 {
     "@timestamp": "2017-10-12T08:05:34.853Z",
-    "agent": {
+    "beat": {
         "hostname": "host.example.com",
         "name": "host.example.com"
-    },
-    "event": {
-        "dataset": "haproxy.stat",
-        "duration": 115000,
-        "module": "haproxy"
     },
     "haproxy": {
         "stat": {
@@ -28,9 +23,10 @@
             },
             "in.bytes": 0,
             "out.bytes": 0,
+            "process_id": 1,
             "proxy": {
                 "id": 2,
-                "name": "stat"
+                "name": "http-webservices"
             },
             "queue": {},
             "request": {
@@ -71,13 +67,9 @@
         }
     },
     "metricset": {
-        "name": "stat"
-    },
-    "process": {
-        "pid": 1
-    },
-    "service": {
-        "address": "127.0.0.1:14567",
-        "type": "haproxy"
+        "host": "haproxy:14567",
+        "module": "haproxy",
+        "name": "stat",
+        "rtt": 115
     }
 }

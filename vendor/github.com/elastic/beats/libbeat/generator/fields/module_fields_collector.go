@@ -69,13 +69,15 @@ func CollectModuleFiles(modulesDir string) ([]*YmlFile, error) {
 // CollectFiles collects all files for the given module including filesets
 func CollectFiles(module string, modulesPath string) ([]*YmlFile, error) {
 	var files []*YmlFile
-	var ymls []*YmlFile
-	var err error
 
-	if ymls, err = makeYml(0, filepath.Join(modulesPath, module, "_meta/fields.yml")); err != nil {
+	fieldsYmlPath := filepath.Join(modulesPath, module, "_meta/fields.yml")
+	ymlFile, err := NewYmlFile(fieldsYmlPath, 0)
+
+	if err != nil {
 		return nil, err
+	} else if ymlFile != nil {
+		files = append(files, ymlFile)
 	}
-	files = append(files, ymls...)
 
 	modulesRoot := filepath.Base(modulesPath)
 	sets, err := ioutil.ReadDir(filepath.Join(modulesPath, module))
@@ -88,11 +90,14 @@ func CollectFiles(module string, modulesPath string) ([]*YmlFile, error) {
 			continue
 		}
 
-		fieldsYmlPath := filepath.Join(modulesPath, module, s.Name(), "_meta/fields.yml")
-		if ymls, err = makeYml(indentByModule[modulesRoot], fieldsYmlPath); err != nil {
+		fieldsYmlPath = filepath.Join(modulesPath, module, s.Name(), "_meta/fields.yml")
+		ymlFile, err := NewYmlFile(fieldsYmlPath, indentByModule[modulesRoot])
+
+		if err != nil {
 			return nil, err
+		} else if ymlFile != nil {
+			files = append(files, ymlFile)
 		}
-		files = append(files, ymls...)
 	}
 	return files, nil
 }

@@ -27,8 +27,6 @@ def load_fileset_test_cases():
     else:
         modules = os.listdir(modules_dir)
 
-    filesets_env = os.getenv("TESTING_FILEBEAT_FILESETS")
-
     test_cases = []
 
     for module in modules:
@@ -37,12 +35,7 @@ def load_fileset_test_cases():
         if not os.path.isdir(path):
             continue
 
-        if filesets_env:
-            filesets = filesets_env.split(",")
-        else:
-            filesets = os.listdir(path)
-
-        for fileset in filesets:
+        for fileset in os.listdir(path):
             if not os.path.isdir(os.path.join(path, fileset)):
                 continue
 
@@ -74,14 +67,6 @@ class Test(BaseTest):
 
         self.index_name = "test-filebeat-modules"
 
-        body = {
-            "transient": {
-                "script.max_compilations_rate": "1000/1m"
-            }
-        }
-
-        self.es.transport.perform_request('PUT', "/_cluster/settings", body=body)
-
     @parameterized.expand(load_fileset_test_cases)
     @unittest.skipIf(not INTEGRATION_TESTS,
                      "integration tests are disabled, run with INTEGRATION_TESTS=1 to enable them.")
@@ -96,7 +81,7 @@ class Test(BaseTest):
             template_name="filebeat_modules",
             output=cfgfile,
             index_name=self.index_name,
-            elasticsearch_url=self.elasticsearch_url,
+            elasticsearch_url=self.elasticsearch_url
         )
 
         self.run_on_file(
@@ -118,7 +103,6 @@ class Test(BaseTest):
             self.filebeat, "-systemTest",
             "-e", "-d", "*", "-once",
             "-c", cfgfile,
-            "-E", "setup.ilm.enabled=false",
             "-modules={}".format(module),
             "-M", "{module}.*.enabled=false".format(module=module),
             "-M", "{module}.{fileset}.enabled=true".format(
@@ -129,11 +113,6 @@ class Test(BaseTest):
                 module=module, fileset=fileset, test_file=test_file),
             "-M", "*.*.input.close_eof=true",
         ]
-
-        # Based on the convention that if a name contains -json the json format is needed. Currently used for LS.
-        if "-json" in test_file:
-            cmd.append("-M")
-            cmd.append("{module}.{fileset}.var.format=json".format(module=module, fileset=fileset))
 
         output_path = os.path.join(self.working_dir)
         output = open(os.path.join(output_path, "output.log"), "ab")
@@ -150,12 +129,12 @@ class Test(BaseTest):
         self.es.indices.refresh(index=self.index_name)
         # Loads the first 100 events to be checked
         res = self.es.search(index=self.index_name,
-                             body={"query": {"match_all": {}}, "size": 100, "sort": {"log.offset": {"order": "asc"}}})
+                             body={"query": {"match_all": {}}, "size": 100, "sort": {"offset": {"order": "asc"}}})
         objects = [o["_source"] for o in res["hits"]["hits"]]
         assert len(objects) > 0
         for obj in objects:
-            assert obj["event"]["module"] == module, "expected event.module={} but got {}".format(
-                module, obj["event"]["module"])
+            assert obj["fileset"]["module"] == module, "expected fileset.module={} but got {}".format(
+                module, obj["fileset"]["module"])
 
             assert "error" not in obj, "not error expected but got: {}".format(
                 obj)
@@ -181,7 +160,7 @@ class Test(BaseTest):
                     objects[k] = self.flatten_object(obj, {}, "")
                     clean_keys(objects[k])
 
-                json.dump(objects, f, indent=4, separators=(',', ': '), sort_keys=True)
+                json.dump(objects, f, indent=4, sort_keys=True)
 
         with open(test_file + "-expected.json", "r") as f:
             expected = json.load(f)
@@ -207,17 +186,17 @@ class Test(BaseTest):
 
 def clean_keys(obj):
     # These keys are host dependent
-    host_keys = ["host.name", "agent.hostname", "agent.type", "agent.ephemeral_id", "agent.id"]
+    host_keys = ["host.name", "beat.hostname", "beat.name"]
     # The create timestamps area always new
-    time_keys = ["event.created"]
-    # source path and agent.version can be different for each run
-    other_keys = ["log.file.path", "agent.version"]
+    time_keys = ["read_timestamp", "event.created"]
+    # source path and beat.version can be different for each run
+    other_keys = ["source", "log.file.path", "beat.version"]
 
     for key in host_keys + time_keys + other_keys:
         delete_key(obj, key)
 
     # Remove timestamp for comparison where timestamp is not part of the log line
-    if (obj["event.dataset"] in ["icinga.startup", "redis.log", "haproxy.log", "system.auth", "system.syslog"]):
+    if obj["event.dataset"] in ["icinga.startup", "redis.log", "haproxy.log", "system.auth", "system.syslog"]:
         delete_key(obj, "@timestamp")
 
 

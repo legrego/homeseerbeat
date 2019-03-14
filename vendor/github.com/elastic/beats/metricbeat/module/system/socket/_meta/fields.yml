@@ -5,14 +5,17 @@
   release: ga
   fields:
     - name: direction
-      type: alias
-      path: network.direction
-      migration: true
+      type: keyword
+      example: incoming
+      description: >
+        How the socket was initiated. Possible values are incoming, outgoing,
+        or listening.
 
     - name: family
-      type: alias
-      path: network.type
-      migration: true
+      type: keyword
+      example: ipv4
+      description: >
+        Address family.
 
     - name: local.ip
       type: ip
@@ -60,31 +63,30 @@
         Error describing the cause of the reverse lookup failure.
 
     - name: process.pid
-      type: alias
-      path: process.pid
-      migration: true
+      type: long
+      description: >
+        ID of the process that opened the socket.
 
     - name: process.command
-      type: alias
-      path: process.name
-      migration: true
+      type: keyword
+      description: >
+        Name of the command (limited to 20 chars by the OS).
 
     - name: process.cmdline
       type: keyword
       description: >
-        Full command line
 
     - name: process.exe
-      type: alias
-      path: process.executable
-      migration: true
+      type: keyword
+      description: >
+        Absolute path to the executable.
 
     - name: user.id
-      type: alias
-      path: user.id
-      migration: true
+      type: long
+      description: >
+        UID of the user running the process.
 
     - name: user.name
-      type: alias
-      path: user.full_name
-      migration: true
+      type: keyword
+      description: >
+        Name of the user running the process.

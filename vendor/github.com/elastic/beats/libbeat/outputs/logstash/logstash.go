@@ -29,7 +29,6 @@ import (
 const (
 	minWindowSize             int = 1
 	defaultStartMaxWindowSize int = 10
-	defaultPort                   = 5044
 )
 
 var debugf = logp.MakeDebug("logstash")
@@ -39,13 +38,16 @@ func init() {
 }
 
 func makeLogstash(
-	_ outputs.IndexManager,
 	beat beat.Info,
 	observer outputs.Observer,
 	cfg *common.Config,
 ) (outputs.Group, error) {
-	config, err := readConfig(cfg, beat)
-	if err != nil {
+	if !cfg.HasField("index") {
+		cfg.SetString("index", -1, beat.Beat)
+	}
+
+	config := newConfig()
+	if err := cfg.Unpack(config); err != nil {
 		return outputs.Fail(err)
 	}
 
@@ -70,7 +72,7 @@ func makeLogstash(
 	for i, host := range hosts {
 		var client outputs.NetworkClient
 
-		conn, err := transport.NewClient(transp, "tcp", host, defaultPort)
+		conn, err := transport.NewClient(transp, "tcp", host, config.Port)
 		if err != nil {
 			return outputs.Fail(err)
 		}

@@ -22,9 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 	"syscall"
-	"time"
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
@@ -82,65 +80,52 @@ type Record struct {
 
 // ToMapStr returns a new MapStr containing the data from this Record.
 func (e Record) ToEvent() beat.Event {
-	// Windows Log Specific data
-	win := common.MapStr{
-		"channel":       e.Channel,
+	m := common.MapStr{
+		"type":          e.API,
+		"log_name":      e.Channel,
+		"source_name":   e.Provider.Name,
+		"computer_name": e.Computer,
+		"record_number": strconv.FormatUint(e.RecordID, 10),
 		"event_id":      e.EventIdentifier.ID,
-		"provider_name": e.Provider.Name,
-		"record_id":     e.RecordID,
-		"task":          e.Task,
-		"api":           e.API,
 	}
-	addOptional(win, "computer_name", e.Computer)
-	addOptional(win, "kernel_time", e.Execution.KernelTime)
-	addOptional(win, "keywords", e.Keywords)
-	addOptional(win, "opcode", e.Opcode)
-	addOptional(win, "processor_id", e.Execution.ProcessorID)
-	addOptional(win, "processor_time", e.Execution.ProcessorTime)
-	addOptional(win, "provider_guid", e.Provider.GUID)
-	addOptional(win, "session_id", e.Execution.SessionID)
-	addOptional(win, "task", e.Task)
-	addOptional(win, "user_time", e.Execution.UserTime)
-	addOptional(win, "version", e.Version)
+
+	addOptional(m, "xml", e.XML)
+	addOptional(m, "provider_guid", e.Provider.GUID)
+	addOptional(m, "version", e.Version)
+	addOptional(m, "level", e.Level)
+	addOptional(m, "task", e.Task)
+	addOptional(m, "opcode", e.Opcode)
+	addOptional(m, "keywords", e.Keywords)
+	addOptional(m, "message", sys.RemoveWindowsLineEndings(e.Message))
+	addOptional(m, "message_error", e.RenderErr)
+
 	// Correlation
-	addOptional(win, "activity_id", e.Correlation.ActivityID)
-	addOptional(win, "related_activity_id", e.Correlation.RelatedActivityID)
+	addOptional(m, "activity_id", e.Correlation.ActivityID)
+	addOptional(m, "related_activity_id", e.Correlation.RelatedActivityID)
+
 	// Execution
-	addOptional(win, "process.pid", e.Execution.ProcessID)
-	addOptional(win, "process.thread.id", e.Execution.ThreadID)
+	addOptional(m, "process_id", e.Execution.ProcessID)
+	addOptional(m, "thread_id", e.Execution.ThreadID)
+	addOptional(m, "processor_id", e.Execution.ProcessorID)
+	addOptional(m, "session_id", e.Execution.SessionID)
+	addOptional(m, "kernel_time", e.Execution.KernelTime)
+	addOptional(m, "user_time", e.Execution.UserTime)
+	addOptional(m, "processor_time", e.Execution.ProcessorTime)
 
 	if e.User.Identifier != "" {
 		user := common.MapStr{
 			"identifier": e.User.Identifier,
 		}
-		win["user"] = user
+		m["user"] = user
+
 		addOptional(user, "name", e.User.Name)
 		addOptional(user, "domain", e.User.Domain)
 		addOptional(user, "type", e.User.Type.String())
 	}
 
-	addPairs(win, "event_data", e.EventData.Pairs)
-	userData := addPairs(win, "user_data", e.UserData.Pairs)
+	addPairs(m, "event_data", e.EventData.Pairs)
+	userData := addPairs(m, "user_data", e.UserData.Pairs)
 	addOptional(userData, "xml_name", e.UserData.Name.Local)
-
-	m := common.MapStr{
-		"winlog": win,
-	}
-
-	// ECS data
-	m.Put("event.kind", "event")
-	m.Put("event.code", e.EventIdentifier.ID)
-	addOptional(m, "event.action", e.Task)
-
-	m.Put("event.created", time.Now())
-
-	addOptional(m, "log.level", strings.ToLower(e.Level))
-	addOptional(m, "message", sys.RemoveWindowsLineEndings(e.Message))
-	// Errors
-	addOptional(m, "error.code", e.RenderErrorCode)
-	addOptional(m, "error.message", e.RenderErr)
-
-	addOptional(m, "event.original", e.XML)
 
 	return beat.Event{
 		Timestamp: e.TimeCreated.SystemTime,
@@ -154,7 +139,7 @@ func (e Record) ToEvent() beat.Event {
 // MapStr.
 func addOptional(m common.MapStr, key string, v interface{}) {
 	if m != nil && !isZero(v) {
-		m.Put(key, v)
+		m[key] = v
 	}
 }
 

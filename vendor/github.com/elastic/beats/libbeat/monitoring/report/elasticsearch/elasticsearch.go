@@ -108,6 +108,7 @@ func defaultConfig(settings report.Settings) config {
 func makeReporter(beat beat.Info, settings report.Settings, cfg *common.Config) (report.Reporter, error) {
 	log := logp.L().Named(selector)
 	config := defaultConfig(settings)
+
 	if err := cfg.Unpack(&config); err != nil {
 		return nil, err
 	}
@@ -171,10 +172,8 @@ func makeReporter(beat beat.Info, settings report.Settings, cfg *common.Config) 
 
 	pipeline, err := pipeline.New(
 		beat,
-		pipeline.Monitors{
-			Metrics: monitoring,
-			Logger:  logp.NewLogger(selector),
-		},
+		pipeline.Monitors{},
+		monitoring,
 		queueFactory,
 		outputs.Group{
 			Clients:   []outputs.Client{outClient},
@@ -357,6 +356,6 @@ func makeMeta(beat beat.Info) common.MapStr {
 		"version": beat.Version,
 		"name":    beat.Name,
 		"host":    beat.Hostname,
-		"uuid":    beat.ID,
+		"uuid":    beat.UUID,
 	}
 }

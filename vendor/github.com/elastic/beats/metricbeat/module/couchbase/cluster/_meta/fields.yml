@@ -2,7 +2,7 @@
   type: group
   description: >
     Couchbase cluster metrics.
-  release: ga
+  release: beta
   fields:
     - name: hdd.free.bytes
       format: bytes

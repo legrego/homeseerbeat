@@ -269,4 +269,5 @@ class Test(BaseTest):
 
     def assert_output(self, output):
         assert len(output) == 2
+        assert output[0]["prospector.type"] == "tcp"
         assert output[0]["input.type"] == "tcp"

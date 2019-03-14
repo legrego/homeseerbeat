@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	p "github.com/elastic/beats/metricbeat/helper/prometheus"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
@@ -49,9 +50,20 @@ func init() {
 type MetricSet struct {
 	mb.BaseMetricSet
 	prometheus p.Prometheus
+	namespace  string
 }
 
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	cfgwarn.Beta("The prometheus collector metricset is beta")
+
+	config := struct {
+		Namespace string `config:"namespace" validate:"required"`
+	}{}
+	err := base.Module().UnpackConfig(&config)
+	if err != nil {
+		return nil, err
+	}
+
 	prometheus, err := p.NewPrometheusClient(base)
 	if err != nil {
 		return nil, err
@@ -60,41 +72,42 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	return &MetricSet{
 		BaseMetricSet: base,
 		prometheus:    prometheus,
+		namespace:     config.Namespace,
 	}, nil
 }
 
-func (m *MetricSet) Fetch(reporter mb.ReporterV2) {
+func (m *MetricSet) Fetch() ([]common.MapStr, error) {
 	families, err := m.prometheus.GetFamilies()
 
 	if err != nil {
-		reporter.Error(fmt.Errorf("Unable to decode response from prometheus endpoint"))
-		return
+		return nil, fmt.Errorf("Unable to decode response from prometheus endpoint")
 	}
 
 	eventList := map[string]common.MapStr{}
 
 	for _, family := range families {
-		promEvents := getPromEventsFromMetricFamily(family)
+		promEvents := GetPromEventsFromMetricFamily(family)
 
 		for _, promEvent := range promEvents {
-			labelsHash := promEvent.LabelsHash()
-			if _, ok := eventList[labelsHash]; !ok {
-				eventList[labelsHash] = common.MapStr{}
+			if _, ok := eventList[promEvent.labelHash]; !ok {
+				eventList[promEvent.labelHash] = common.MapStr{}
 
 				// Add labels
 				if len(promEvent.labels) > 0 {
-					eventList[labelsHash]["labels"] = promEvent.labels
+					eventList[promEvent.labelHash]["label"] = promEvent.labels
 				}
 			}
 
-			eventList[labelsHash].Update(common.MapStr{
-				"metrics": promEvent.data,
-			})
+			eventList[promEvent.labelHash][promEvent.key] = promEvent.value
 		}
 	}
 
 	// Converts hash list to slice
+	events := []common.MapStr{}
 	for _, e := range eventList {
-		reporter.Event(mb.Event{ModuleFields: e})
+		e[mb.NamespaceKey] = m.namespace
+		events = append(events, e)
 	}
+
+	return events, err
 }

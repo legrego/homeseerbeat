@@ -18,10 +18,9 @@
 package processors
 
 import (
+	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/elastic/beats/libbeat/common"
 )
@@ -59,7 +58,7 @@ func (ns *Namespace) add(names []string, p pluginer) error {
 	// register plugin if intermediate node in path being processed
 	if len(names) == 1 {
 		if _, found := ns.reg[name]; found {
-			return errors.Errorf("%v exists already", name)
+			return errors.New("exists already")
 		}
 
 		ns.reg[name] = p
@@ -95,20 +94,20 @@ func (ns *Namespace) Plugin() Constructor {
 			}
 
 			if section != "" {
-				return nil, errors.Errorf("too many lookup modules "+
-					"configured (%v, %v)", section, name)
+				return nil, fmt.Errorf("Too many lookup modules configured (%v, %v)",
+					section, name)
 			}
 
 			section = name
 		}
 
 		if section == "" {
-			return nil, errors.New("no lookup module configured")
+			return nil, errors.New("No lookup module configured")
 		}
 
 		backend, found := ns.reg[section]
 		if !found {
-			return nil, errors.Errorf("unknown lookup module: %v", section)
+			return nil, fmt.Errorf("Unknown lookup module: %v", section)
 		}
 
 		config, err := cfg.Child(section, -1)

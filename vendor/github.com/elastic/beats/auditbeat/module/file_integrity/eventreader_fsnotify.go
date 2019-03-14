@@ -129,8 +129,7 @@ func (r *reader) nextEvent(done <-chan struct{}) *Event {
 			return nil
 
 		case event := <-r.watcher.EventChannel():
-			if event.Name == "" || r.config.IsExcludedPath(event.Name) ||
-				!r.config.IsIncludedPath(event.Name) {
+			if event.Name == "" || r.config.IsExcludedPath(event.Name) {
 				continue
 			}
 			r.log.Debugw("Received fsnotify event",

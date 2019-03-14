@@ -153,8 +153,7 @@ func (r *fsreader) consumeEvents(done <-chan struct{}) {
 			return
 		case events := <-r.stream.Events:
 			for _, event := range events {
-				if !r.isWatched(event.Path) || r.config.IsExcludedPath(event.Path) ||
-					!r.config.IsIncludedPath(event.Path) {
+				if !r.isWatched(event.Path) || r.config.IsExcludedPath(event.Path) {
 					continue
 				}
 				r.log.Debugw("Received FSEvents event",

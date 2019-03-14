@@ -39,6 +39,9 @@ func TestNOTCondition(t *testing.T) {
 	}
 
 	conds := GetConditions(t, configs)
+	for _, cond := range conds {
+		logp.Debug("test", "%s", cond)
+	}
 
 	assert.False(t, conds[0].Check(httpResponseTestEvent))
 }

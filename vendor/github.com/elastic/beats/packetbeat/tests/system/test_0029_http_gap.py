@@ -22,5 +22,6 @@ class Test(BaseTest):
         o = objs[0]
 
         assert o["status"] == "OK"
-        print(o["error.message"])
-        assert o["error.message"] == "Packet loss while capturing the response"
+        print(o["notes"])
+        assert len(o["notes"]) == 1
+        assert o["notes"][0] == "Packet loss while capturing the response"

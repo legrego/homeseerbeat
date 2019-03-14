@@ -3,6 +3,11 @@
   description: >
       Contains fields from MongoDB logs.
   fields:
+  - name: severity
+    description: >
+        Severity level of message
+    example: I
+    type: keyword
   - name: component
     description: >
         Functional categorization of message
@@ -13,12 +18,7 @@
         Context of message
     example: initandlisten
     type: keyword
-
-  - name: severity
-    type: alias
-    path: log.level
-    migration: true
   - name: message
-    type: alias
-    path: message
-    migration: true
+    description: >
+        The message in the log line.
+    type: text

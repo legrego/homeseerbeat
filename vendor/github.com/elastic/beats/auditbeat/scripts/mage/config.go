@@ -18,70 +18,55 @@
 package mage
 
 import (
-	"path/filepath"
+	"fmt"
+	"regexp"
 
 	"github.com/pkg/errors"
 
 	"github.com/elastic/beats/dev-tools/mage"
 )
 
+// -----------------------------------------------------------------------------
+// Customizations specific to Auditbeat.
+// - Config files are Go templates.
+
 const (
-	// configTemplateGlob matches Auditbeat modules' config file templates.
-	configTemplateGlob = "module/*/_meta/config*.yml.tmpl"
+	// ConfigTemplateGlob matches Auditbeat modules' config file templates.
+	ConfigTemplateGlob      = "module/*/_meta/config*.yml.tmpl"
+	shortConfigTemplate     = "build/auditbeat.yml.tmpl"
+	referenceConfigTemplate = "build/auditbeat.reference.yml.tmpl"
 )
 
-// OSSConfigFileParams returns the parameters for generating OSS config.
-func OSSConfigFileParams() mage.ConfigFileParams {
-	params, err := configFileParams(mage.OSSBeatDir())
-	if err != nil {
-		panic(err)
-	}
-	return params
-}
-
-// XPackConfigFileParams returns the parameters for generating X-Pack config.
-func XPackConfigFileParams() mage.ConfigFileParams {
-	params, err := configFileParams(mage.OSSBeatDir(), mage.XPackBeatDir())
-	if err != nil {
-		panic(err)
-	}
-	return params
-}
-
-func configFileParams(dirs ...string) (mage.ConfigFileParams, error) {
-	var globs []string
-	for _, dir := range dirs {
-		globs = append(globs, filepath.Join(dir, configTemplateGlob))
-	}
-
+func makeConfigTemplates(globs ...string) error {
 	configFiles, err := mage.FindFiles(globs...)
 	if err != nil {
-		return mage.ConfigFileParams{}, errors.Wrap(err, "failed to find config templates")
-	}
-	if len(configFiles) == 0 {
-		return mage.ConfigFileParams{}, errors.Errorf("no config files found in %v", globs)
+		return errors.Wrap(err, "failed to find config templates")
 	}
 
-	return mage.ConfigFileParams{
-		ShortParts: join(
-			mage.OSSBeatDir("_meta/common.p1.yml"),
-			configFiles,
-			mage.OSSBeatDir("_meta/common.p2.yml"),
-			mage.LibbeatDir("_meta/config.yml"),
-		),
-		ReferenceParts: join(
-			mage.OSSBeatDir("_meta/common.reference.yml"),
-			configFiles,
-			mage.LibbeatDir("_meta/config.reference.yml"),
-		),
-		DockerParts: []string{
-			mage.OSSBeatDir("_meta/beat.docker.yml"),
-			mage.LibbeatDir("_meta/config.docker.yml"),
-		},
-		ExtraVars: map[string]interface{}{
-			"ArchBits": archBits,
-		},
-	}, nil
+	var shortIn []string
+	shortIn = append(shortIn, mage.OSSBeatDir("_meta/common.p1.yml"))
+	shortIn = append(shortIn, configFiles...)
+	shortIn = append(shortIn, mage.OSSBeatDir("_meta/common.p2.yml"))
+	shortIn = append(shortIn, mage.LibbeatDir("_meta/config.yml"))
+	if !mage.IsUpToDate(shortConfigTemplate, shortIn...) {
+		fmt.Println(">> Building", shortConfigTemplate)
+		mage.MustFileConcat(shortConfigTemplate, 0600, shortIn...)
+		mage.MustFindReplace(shortConfigTemplate, regexp.MustCompile("beatname"), "{{.BeatName}}")
+		mage.MustFindReplace(shortConfigTemplate, regexp.MustCompile("beat-index-prefix"), "{{.BeatIndexPrefix}}")
+	}
+
+	var referenceIn []string
+	referenceIn = append(referenceIn, mage.OSSBeatDir("_meta/common.reference.yml"))
+	referenceIn = append(referenceIn, configFiles...)
+	referenceIn = append(referenceIn, mage.LibbeatDir("_meta/config.reference.yml"))
+	if !mage.IsUpToDate(referenceConfigTemplate, referenceIn...) {
+		fmt.Println(">> Building", referenceConfigTemplate)
+		mage.MustFileConcat(referenceConfigTemplate, 0644, referenceIn...)
+		mage.MustFindReplace(referenceConfigTemplate, regexp.MustCompile("beatname"), "{{.BeatName}}")
+		mage.MustFindReplace(referenceConfigTemplate, regexp.MustCompile("beat-index-prefix"), "{{.BeatIndexPrefix}}")
+	}
+
+	return nil
 }
 
 // archBits returns the number of bit width of the GOARCH architecture value.
@@ -96,15 +81,25 @@ func archBits(goarch string) int {
 	}
 }
 
-func join(items ...interface{}) []string {
-	var out []string
-	for _, item := range items {
-		switch v := item.(type) {
-		case string:
-			out = append(out, v)
-		case []string:
-			out = append(out, v...)
-		}
+// Config generates the auditbeat.yml and auditbeat.reference.yml config files.
+// Set DEV_OS and DEV_ARCH to change the target host for the generated configs.
+// Defaults to linux/amd64.
+func Config(configTemplateGlobs ...string) error {
+	if err := makeConfigTemplates(configTemplateGlobs...); err != nil {
+		return errors.Wrap(err, "failed making config templates")
 	}
-	return out
+
+	params := map[string]interface{}{
+		"GOOS":      mage.EnvOr("DEV_OS", "linux"),
+		"GOARCH":    mage.EnvOr("DEV_ARCH", "amd64"),
+		"ArchBits":  archBits,
+		"Reference": false,
+	}
+	fmt.Printf(">> Building auditbeat.yml for %v/%v\n", params["GOOS"], params["GOARCH"])
+	mage.MustExpandFile(shortConfigTemplate, "auditbeat.yml", params)
+
+	params["Reference"] = true
+	fmt.Printf(">> Building auditbeat.reference.yml for %v/%v\n", params["GOOS"], params["GOARCH"])
+	mage.MustExpandFile(referenceConfigTemplate, "auditbeat.reference.yml", params)
+	return nil
 }

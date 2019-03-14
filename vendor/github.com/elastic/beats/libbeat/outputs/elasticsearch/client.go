@@ -28,8 +28,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
+
+	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/outputs"
 	"github.com/elastic/beats/libbeat/outputs/outil"
@@ -43,7 +44,7 @@ type Client struct {
 	Connection
 	tlsConfig *transport.TLSConfig
 
-	index    outputs.IndexSelector
+	index    outil.Selector
 	pipeline *outil.Selector
 	params   map[string]string
 	timeout  time.Duration
@@ -70,7 +71,7 @@ type ClientSettings struct {
 	EscapeHTML         bool
 	Parameters         map[string]string
 	Headers            map[string]string
-	Index              outputs.IndexSelector
+	Index              outil.Selector
 	Pipeline           *outil.Selector
 	Timeout            time.Duration
 	CompressionLevel   int
@@ -103,7 +104,7 @@ type bulkCreateAction struct {
 
 type bulkEventMeta struct {
 	Index    string `json:"_index" struct:"_index"`
-	DocType  string `json:"_type,omitempty" struct:"_type,omitempty"`
+	DocType  string `json:"_type" struct:"_type"`
 	Pipeline string `json:"pipeline,omitempty" struct:"pipeline,omitempty"`
 	ID       string `json:"_id,omitempty" struct:"_id,omitempty"`
 }
@@ -113,7 +114,6 @@ type bulkResultStats struct {
 	duplicates   int // number of events failed with `create` due to ID already being indexed
 	fails        int // number of failed events (can be retried)
 	nonIndexable int // number of failed events (not indexable -> must be dropped)
-	tooMany      int // number of events receiving HTTP 429 Too Many Requests
 }
 
 var (
@@ -131,7 +131,7 @@ var (
 )
 
 const (
-	defaultEventType = "doc"
+	eventType = "doc"
 )
 
 // NewClient instantiates a new client.
@@ -302,13 +302,8 @@ func (client *Client) publishEvents(
 	// encode events into bulk request buffer, dropping failed elements from
 	// events slice
 
-	eventType := ""
-	if client.GetVersion().Major < 7 {
-		eventType = defaultEventType
-	}
-
 	origCount := len(data)
-	data = bulkEncodePublishRequest(body, client.index, client.pipeline, eventType, data)
+	data = bulkEncodePublishRequest(body, client.index, client.pipeline, data)
 	newCount := len(data)
 	if st != nil && origCount > newCount {
 		st.Dropped(origCount - newCount)
@@ -350,7 +345,6 @@ func (client *Client) publishEvents(
 		st.Failed(failed)
 		st.Dropped(dropped)
 		st.Duplicate(duplicates)
-		st.ErrTooMany(stats.tooMany)
 	}
 
 	if failed > 0 {
@@ -366,15 +360,14 @@ func (client *Client) publishEvents(
 // successfully added to bulk request.
 func bulkEncodePublishRequest(
 	body bulkWriter,
-	index outputs.IndexSelector,
+	index outil.Selector,
 	pipeline *outil.Selector,
-	eventType string,
 	data []publisher.Event,
 ) []publisher.Event {
 	okEvents := data[:0]
 	for i := range data {
 		event := &data[i].Content
-		meta, err := createEventBulkMeta(index, pipeline, eventType, event)
+		meta, err := createEventBulkMeta(index, pipeline, event)
 		if err != nil {
 			logp.Err("Failed to encode event meta data: %s", err)
 			continue
@@ -390,9 +383,8 @@ func bulkEncodePublishRequest(
 }
 
 func createEventBulkMeta(
-	indexSel outputs.IndexSelector,
+	indexSel outil.Selector,
 	pipelineSel *outil.Selector,
-	eventType string,
 	event *beat.Event,
 ) (interface{}, error) {
 	pipeline, err := getPipeline(event, pipelineSel)
@@ -401,7 +393,7 @@ func createEventBulkMeta(
 		return nil, err
 	}
 
-	index, err := indexSel.Select(event)
+	index, err := getIndex(event, indexSel)
 	if err != nil {
 		err := fmt.Errorf("failed to select event index: %v", err)
 		return nil, err
@@ -445,6 +437,24 @@ func getPipeline(event *beat.Event, pipelineSel *outil.Selector) (string, error)
 		return pipelineSel.Select(event)
 	}
 	return "", nil
+}
+
+// getIndex returns the full index name
+// Index is either defined in the config as part of the output
+// or can be overload by the event through setting index
+func getIndex(event *beat.Event, index outil.Selector) (string, error) {
+	if event.Meta != nil {
+		if str, exists := event.Meta["index"]; exists {
+			idx, ok := str.(string)
+			if ok {
+				ts := event.Timestamp.UTC()
+				return fmt.Sprintf("%s-%d.%02d.%02d",
+					idx, ts.Year(), ts.Month(), ts.Day()), nil
+			}
+		}
+	}
+
+	return index.Select(event)
 }
 
 // bulkCollectPublishFails checks per item errors returning all events
@@ -508,15 +518,11 @@ func bulkCollectPublishFails(
 			continue // ok
 		}
 
-		if status < 500 {
-			if status == http.StatusTooManyRequests {
-				stats.tooMany++
-			} else {
-				// hard failure, don't collect
-				logp.Warn("Cannot index event %#v (status=%v): %s", data[i], status, msg)
-				stats.nonIndexable++
-				continue
-			}
+		if status < 500 && status != 429 {
+			// hard failure, don't collect
+			logp.Warn("Cannot index event %#v (status=%v): %s", data[i], status, msg)
+			stats.nonIndexable++
+			continue
 		}
 
 		debugf("Bulk item insert failed (i=%v, status=%v): %s", i, status, msg)
@@ -624,7 +630,7 @@ func (client *Client) LoadJSON(path string, json map[string]interface{}) ([]byte
 	return body, nil
 }
 
-// GetVersion returns the elasticsearch version the client is connected to.
+// GetVersion returns the elasticsearch version the client is connected to
 func (client *Client) GetVersion() common.Version {
 	return client.Connection.version
 }
@@ -665,16 +671,7 @@ func (client *Client) String() string {
 	return "elasticsearch(" + client.Connection.URL + ")"
 }
 
-// Connect connects the client. It runs a GET request against the root URL of
-// the configured host, updates the known Elasticsearch version and calls
-// globally configured handlers.
-func (client *Client) Connect() error {
-	return client.Connection.Connect()
-}
-
-// Connect connects the client. It runs a GET request against the root URL of
-// the configured host, updates the known Elasticsearch version and calls
-// globally configured handlers.
+// Connect connects the client.
 func (conn *Connection) Connect() error {
 	versionString, err := conn.Ping()
 	if err != nil {
@@ -767,7 +764,7 @@ func (conn *Connection) execRequest(
 ) (int, []byte, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		logp.Warn("Failed to create request %+v", err)
+		logp.Warn("Failed to create request", err)
 		return 0, nil, err
 	}
 	if body != nil {

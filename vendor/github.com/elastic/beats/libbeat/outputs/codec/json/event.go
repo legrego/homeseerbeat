@@ -46,7 +46,7 @@ func makeEvent(index, version string, in *beat.Event) event {
 		Meta: meta{
 			Beat:    index,
 			Version: version,
-			Type:    "_doc",
+			Type:    "doc",
 			Fields:  in.Meta,
 		},
 		Fields: in.Fields,

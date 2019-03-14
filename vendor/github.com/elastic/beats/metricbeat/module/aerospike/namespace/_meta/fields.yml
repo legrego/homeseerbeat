@@ -2,7 +2,7 @@
   type: group
   description: >
     namespace
-  release: ga
+  release: beta
   fields:
     - name: client
       type: group

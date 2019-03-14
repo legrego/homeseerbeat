@@ -1,6 +1,6 @@
 - name: cluster_status
   type: group
-  release: ga
+  release: beta
   description: >
     cluster_status
   fields:

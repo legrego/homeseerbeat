@@ -18,12 +18,15 @@
 package keyspace
 
 import (
-	"github.com/pkg/errors"
+	"time"
 
+	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
 	"github.com/elastic/beats/metricbeat/module/redis"
+
+	rd "github.com/garyburd/redigo/redis"
 )
 
 var (
@@ -39,27 +42,43 @@ func init() {
 
 // MetricSet for fetching Redis server information and statistics.
 type MetricSet struct {
-	*redis.MetricSet
+	mb.BaseMetricSet
+	pool *rd.Pool
 }
 
 // New creates new instance of MetricSet
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	ms, err := redis.NewMetricSet(base)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create 'keyspace' metricset")
+	// Unpack additional configuration options.
+	config := struct {
+		IdleTimeout time.Duration `config:"idle_timeout"`
+		Network     string        `config:"network"`
+		MaxConn     int           `config:"maxconn" validate:"min=1"`
+		Password    string        `config:"password"`
+	}{
+		Network:  "tcp",
+		MaxConn:  10,
+		Password: "",
 	}
-	return &MetricSet{ms}, nil
+	err := base.Module().UnpackConfig(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MetricSet{
+		BaseMetricSet: base,
+		pool: redis.CreatePool(base.Host(), config.Password, config.Network,
+			config.MaxConn, config.IdleTimeout, base.Module().Config().Timeout),
+	}, nil
 }
 
 // Fetch fetches metrics from Redis by issuing the INFO command.
-func (m *MetricSet) Fetch(r mb.ReporterV2) {
+func (m *MetricSet) Fetch() ([]common.MapStr, error) {
 	// Fetch default INFO.
-	info, err := redis.FetchRedisInfo("keyspace", m.Connection())
+	info, err := redis.FetchRedisInfo("keyspace", m.pool.Get())
 	if err != nil {
-		logp.Err("Failed to fetch redis info for keyspaces: %s", err)
-		return
+		return nil, err
 	}
 
 	debugf("Redis INFO from %s: %+v", m.Host(), info)
-	eventsMapping(r, info)
+	return eventsMapping(info), nil
 }

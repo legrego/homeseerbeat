@@ -3,7 +3,7 @@
   description: >
     `pool` contains the metrics that were obtained from the PHP-FPM process
     pool.
-  release: ga
+  release: beta
   fields:
     - name: process_manager
       type: keyword

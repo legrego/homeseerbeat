@@ -31,14 +31,15 @@ import (
 	"strings"
 	"time"
 
-	mkdns "github.com/miekg/dns"
-	"golang.org/x/net/publicsuffix"
-
+	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/monitoring"
-	"github.com/elastic/beats/packetbeat/pb"
+
 	"github.com/elastic/beats/packetbeat/protos"
+
+	mkdns "github.com/miekg/dns"
+	"golang.org/x/net/publicsuffix"
 )
 
 type dnsPlugin struct {
@@ -100,7 +101,7 @@ type hashableDNSTuple [maxDNSTupleRawSize]byte
 type dnsMessage struct {
 	ts           time.Time          // Time when the message was received.
 	tuple        common.IPPortTuple // Source and destination addresses of packet.
-	cmdlineTuple *common.ProcessTuple
+	cmdlineTuple *common.CmdlineTuple
 	data         *mkdns.Msg // Parsed DNS packet data.
 	length       int        // Length of the DNS message in bytes (without DecodeOffset).
 }
@@ -266,7 +267,7 @@ func (dns *dnsPlugin) setFromConfig(config *dnsConfig) error {
 	return nil
 }
 
-func newTransaction(ts time.Time, tuple dnsTuple, cmd common.ProcessTuple) *dnsTransaction {
+func newTransaction(ts time.Time, tuple dnsTuple, cmd common.CmdlineTuple) *dnsTransaction {
 	trans := &dnsTransaction{
 		transport: tuple.transport,
 		ts:        ts,
@@ -364,27 +365,26 @@ func (dns *dnsPlugin) publishTransaction(t *dnsTransaction) {
 
 	debugf("Publishing transaction. %s", t.tuple.String())
 
-	evt, pbf := pb.NewBeatEvent(t.ts)
-
-	pbf.SetSource(&t.src)
-	pbf.SetDestination(&t.dst)
-	pbf.Network.Transport = t.transport.String()
-	pbf.Network.Protocol = "dns"
-	pbf.Error.Message = t.notes
-
-	fields := evt.Fields
+	timestamp := t.ts
+	fields := common.MapStr{}
 	fields["type"] = "dns"
+	fields["transport"] = t.transport.String()
+	fields["src"] = &t.src
+	fields["dst"] = &t.dst
 	fields["status"] = common.ERROR_STATUS
+	if len(t.notes) == 1 {
+		fields["notes"] = t.notes[0]
+	} else if len(t.notes) > 1 {
+		fields["notes"] = strings.Join(t.notes, " ")
+	}
 
 	dnsEvent := common.MapStr{}
 	fields["dns"] = dnsEvent
 
 	if t.request != nil && t.response != nil {
-		pbf.Source.Bytes = int64(t.request.length)
-		pbf.Destination.Bytes = int64(t.response.length)
-		pbf.Event.Start = t.request.ts
-		pbf.Event.End = t.response.ts
-
+		fields["bytes_in"] = t.request.length
+		fields["bytes_out"] = t.response.length
+		fields["responsetime"] = int32(t.response.ts.Sub(t.ts).Nanoseconds() / 1e6)
 		fields["method"] = dnsOpCodeToString(t.request.data.Opcode)
 		if len(t.request.data.Question) > 0 {
 			fields["query"] = dnsQuestionToString(t.request.data.Question[0])
@@ -404,9 +404,7 @@ func (dns *dnsPlugin) publishTransaction(t *dnsTransaction) {
 			fields["response"] = dnsToString(t.response.data)
 		}
 	} else if t.request != nil {
-		pbf.Source.Bytes = int64(t.request.length)
-		pbf.Event.Start = t.request.ts
-
+		fields["bytes_in"] = t.request.length
 		fields["method"] = dnsOpCodeToString(t.request.data.Opcode)
 		if len(t.request.data.Question) > 0 {
 			fields["query"] = dnsQuestionToString(t.request.data.Question[0])
@@ -419,9 +417,7 @@ func (dns *dnsPlugin) publishTransaction(t *dnsTransaction) {
 			fields["request"] = dnsToString(t.request.data)
 		}
 	} else if t.response != nil {
-		pbf.Destination.Bytes = int64(t.response.length)
-		pbf.Event.End = t.response.ts
-
+		fields["bytes_out"] = t.response.length
 		fields["method"] = dnsOpCodeToString(t.response.data.Opcode)
 		if len(t.response.data.Question) > 0 {
 			fields["query"] = dnsQuestionToString(t.response.data.Question[0])
@@ -434,7 +430,10 @@ func (dns *dnsPlugin) publishTransaction(t *dnsTransaction) {
 		}
 	}
 
-	dns.results(evt)
+	dns.results(beat.Event{
+		Timestamp: timestamp,
+		Fields:    fields,
+	})
 }
 
 func (dns *dnsPlugin) expireTransaction(t *dnsTransaction) {
@@ -468,9 +467,9 @@ func addDNSToMapStr(m common.MapStr, dns *mkdns.Msg, authority bool, additional 
 		}
 		m["question"] = qMapStr
 
-		eTLDPlusOne, err := publicsuffix.EffectiveTLDPlusOne(q.Name)
+		eTLDPlusOne, err := publicsuffix.EffectiveTLDPlusOne(strings.TrimRight(q.Name, "."))
 		if err == nil {
-			qMapStr["etld_plus_one"] = eTLDPlusOne
+			qMapStr["etld_plus_one"] = eTLDPlusOne + "."
 		}
 	}
 
@@ -548,7 +547,7 @@ func rrsToMapStrs(records []mkdns.RR) []common.MapStr {
 		if len(mapStr) == 0 { // OPT pseudo-RR returns an empty MapStr
 			continue
 		}
-		mapStr["name"] = trimRightDot(rrHeader.Name)
+		mapStr["name"] = rrHeader.Name
 		mapStr["type"] = dnsTypeToString(rrHeader.Rrtype)
 		mapStr["class"] = dnsClassToString(rrHeader.Class)
 		mapStr["ttl"] = strconv.FormatInt(int64(rrHeader.Ttl), 10)
@@ -623,7 +622,7 @@ func rrToMapStr(rr mkdns.RR) common.MapStr {
 	case *mkdns.AAAA:
 		mapStr["data"] = x.AAAA.String()
 	case *mkdns.CNAME:
-		mapStr["data"] = trimRightDot(x.Target)
+		mapStr["data"] = x.Target
 	case *mkdns.DNSKEY:
 		mapStr["flags"] = strconv.Itoa(int(x.Flags))
 		mapStr["protocol"] = strconv.Itoa(int(x.Protocol))
@@ -636,9 +635,9 @@ func rrToMapStr(rr mkdns.RR) common.MapStr {
 		mapStr["data"] = strings.ToUpper(x.Digest)
 	case *mkdns.MX:
 		mapStr["preference"] = x.Preference
-		mapStr["data"] = trimRightDot(x.Mx)
+		mapStr["data"] = x.Mx
 	case *mkdns.NS:
-		mapStr["data"] = trimRightDot(x.Ns)
+		mapStr["data"] = x.Ns
 	case *mkdns.NSEC:
 		mapStr["type_bits"] = dnsTypeBitsMapToString(x.TypeBitMap)
 		mapStr["data"] = x.NextDomain
@@ -658,7 +657,7 @@ func rrToMapStr(rr mkdns.RR) common.MapStr {
 		// OPT pseudo-RR is managed in addDnsToMapStr function
 		return nil
 	case *mkdns.PTR:
-		mapStr["data"] = trimRightDot(x.Ptr)
+		mapStr["data"] = x.Ptr
 	case *mkdns.RFC3597:
 		// Miekg/dns lib doesn't handle this type
 		debugf("Unknown RR type %s", dnsTypeToString(rrType))
@@ -675,21 +674,21 @@ func rrToMapStr(rr mkdns.RR) common.MapStr {
 		mapStr["expiration"] = mkdns.TimeToString(x.Expiration)
 		mapStr["inception"] = mkdns.TimeToString(x.Inception)
 		mapStr["key_tag"] = strconv.Itoa(int(x.KeyTag))
-		mapStr["signer_name"] = trimRightDot(x.SignerName)
+		mapStr["signer_name"] = x.SignerName
 		mapStr["data"] = x.Signature
 	case *mkdns.SOA:
-		mapStr["rname"] = trimRightDot(x.Mbox)
+		mapStr["rname"] = x.Mbox
 		mapStr["serial"] = x.Serial
 		mapStr["refresh"] = x.Refresh
 		mapStr["retry"] = x.Retry
 		mapStr["expire"] = x.Expire
 		mapStr["minimum"] = x.Minttl
-		mapStr["data"] = trimRightDot(x.Ns)
+		mapStr["data"] = x.Ns
 	case *mkdns.SRV:
 		mapStr["priority"] = x.Priority
 		mapStr["weight"] = x.Weight
 		mapStr["port"] = x.Port
-		mapStr["data"] = trimRightDot(x.Target)
+		mapStr["data"] = x.Target
 	case *mkdns.TXT:
 		mapStr["data"] = strings.Join(x.Txt, " ")
 	}
@@ -798,22 +797,10 @@ func decodeDNSData(transp transport, rawData []byte) (dns *mkdns.Msg, err error)
 
 	// Message should be more than 12 bytes.
 	// The 12 bytes value corresponds to a message header length.
-	// We use this check because Unpack does not return an error for some invalid messages.
+	// We use this check because Unpack does not return an error for some unvalid messages.
 	// TODO: can a better solution be found?
 	if msg.Len() <= 12 || err != nil {
 		return nil, nonDNSMsg
 	}
-
-	// Normalize question names.
-	for i, q := range msg.Question {
-		msg.Question[i].Name = trimRightDot(q.Name)
-	}
 	return msg, nil
-}
-
-func trimRightDot(name string) string {
-	if len(name) == 0 || name == "." || name[len(name)-1] != '.' {
-		return name
-	}
-	return name[:len(name)-1]
 }

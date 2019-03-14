@@ -1,8 +1,9 @@
 - key: envoyproxy
   title: "envoyproxy"
   description: >
+    experimental[]
+
     envoyproxy module
-  release: ga
   fields:
     - name: envoyproxy
       type: group

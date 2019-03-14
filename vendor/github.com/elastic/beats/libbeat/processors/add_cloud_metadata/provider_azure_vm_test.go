@@ -78,16 +78,14 @@ func TestRetrieveAzureMetadata(t *testing.T) {
 	}
 
 	expected := common.MapStr{
-		"cloud": common.MapStr{
-			"provider": "az",
-			"instance": common.MapStr{
-				"id":   "04ab04c3-63de-4709-a9f9-9ab8c0411d5e",
-				"name": "test-az-vm",
+		"meta": common.MapStr{
+			"cloud": common.MapStr{
+				"provider":      "az",
+				"instance_id":   "04ab04c3-63de-4709-a9f9-9ab8c0411d5e",
+				"instance_name": "test-az-vm",
+				"machine_type":  "Standard_D3_v2",
+				"region":        "eastus2",
 			},
-			"machine": common.MapStr{
-				"type": "Standard_D3_v2",
-			},
-			"region": "eastus2",
 		},
 	}
 	assert.Equal(t, expected, actual.Fields)

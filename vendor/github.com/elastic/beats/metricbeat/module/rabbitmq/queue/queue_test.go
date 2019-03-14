@@ -31,22 +31,28 @@ func TestFetchEventContents(t *testing.T) {
 	server := mtest.Server(t, mtest.DefaultServerConfig)
 	defer server.Close()
 
-	reporter := &mbtest.CapturingReporterV2{}
+	config := map[string]interface{}{
+		"module":     "rabbitmq",
+		"metricsets": []string{"queue"},
+		"hosts":      []string{server.URL},
+	}
 
-	metricSet := mbtest.NewReportingMetricSetV2(t, getConfig(server.URL))
-	metricSet.Fetch(reporter)
+	f := mbtest.NewEventsFetcher(t, config)
+	events, err := f.Fetch()
+	event := events[0]
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
 
-	e := mbtest.StandardizeEvent(metricSet, reporter.GetEvents()[0])
-	t.Logf("%s/%s event: %+v", metricSet.Module().Name(), metricSet.Name(), e.Fields.StringToPrint())
-
-	ee, _ := e.Fields.GetValue("rabbitmq.queue")
-	event := ee.(common.MapStr)
+	t.Logf("%s/%s event: %+v", f.Module().Name(), f.Name(), event.StringToPrint())
 
 	assert.EqualValues(t, "queuenamehere", event["name"])
+	assert.EqualValues(t, "/", event["vhost"])
 	assert.EqualValues(t, true, event["durable"])
 	assert.EqualValues(t, false, event["auto_delete"])
 	assert.EqualValues(t, false, event["exclusive"])
 	assert.EqualValues(t, "running", event["state"])
+	assert.EqualValues(t, "rabbit@localhost", event["node"])
 
 	arguments := event["arguments"].(common.MapStr)
 	assert.EqualValues(t, 9, arguments["max_priority"])
@@ -83,26 +89,4 @@ func TestFetchEventContents(t *testing.T) {
 	writes := disk["writes"].(common.MapStr)
 	assert.EqualValues(t, 212, reads["count"])
 	assert.EqualValues(t, 121, writes["count"])
-}
-
-func TestData(t *testing.T) {
-	server := mtest.Server(t, mtest.DefaultServerConfig)
-	defer server.Close()
-
-	ms := mbtest.NewReportingMetricSetV2(t, getConfig(server.URL))
-	err := mbtest.WriteEventsReporterV2Cond(ms, t, "", func(e common.MapStr) bool {
-		hasTotal, _ := e.HasKey("rabbitmq.queue.messages.total")
-		return hasTotal
-	})
-	if err != nil {
-		t.Fatal("write", err)
-	}
-}
-
-func getConfig(url string) map[string]interface{} {
-	return map[string]interface{}{
-		"module":     "rabbitmq",
-		"metricsets": []string{"queue"},
-		"hosts":      []string{url},
-	}
 }

@@ -74,14 +74,13 @@ func Clean() error {
 // Package packages the Beat for distribution.
 // Use SNAPSHOT=true to build snapshots.
 // Use PLATFORMS to control the target platforms.
-// Use VERSION_QUALIFIER to control the version qualifier.
 func Package() {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
 	mage.UseElasticBeatOSSPackaging()
 	mage.PackageKibanaDashboardsFromBuildDir()
-	auditbeat.CustomizePackaging(auditbeat.OSSPackaging)
+	auditbeat.CustomizePackaging()
 
 	mg.SerialDeps(Fields, Dashboards, Config, mage.GenerateModuleIncludeListGo)
 	mg.Deps(CrossBuild, CrossBuildGoDaemon)
@@ -93,39 +92,11 @@ func TestPackages() error {
 	return mage.TestPackages()
 }
 
-// Update is an alias for running fields, dashboards, config, includes.
-func Update() {
-	mg.SerialDeps(Fields, Dashboards, Config,
-		mage.GenerateModuleIncludeListGo, Docs)
-}
-
-// Config generates both the short/reference configs and populates the modules.d
-// directory.
-func Config() error {
-	return mage.Config(mage.AllConfigTypes, auditbeat.OSSConfigFileParams(), ".")
-}
-
-// Fields generates fields.yml and fields.go files for the Beat.
+// Fields generates a fields.yml and fields.go for the Beat.
 func Fields() {
-	mg.Deps(libbeatAndAuditbeatCommonFieldsGo, moduleFieldsGo)
-	mg.Deps(fieldsYML)
+	mg.SerialDeps(fieldsYML, mage.GenerateAllInOneFieldsGo)
 }
 
-// libbeatAndAuditbeatCommonFieldsGo generates a fields.go containing both
-// libbeat and auditbeat's common fields.
-func libbeatAndAuditbeatCommonFieldsGo() error {
-	if err := mage.GenerateFieldsYAML(); err != nil {
-		return err
-	}
-	return mage.GenerateAllInOneFieldsGo()
-}
-
-// moduleFieldsGo generates a fields.go for each module.
-func moduleFieldsGo() error {
-	return mage.GenerateModuleFieldsGo("module")
-}
-
-// fieldsYML generates the fields.yml file containing all fields.
 func fieldsYML() error {
 	return mage.GenerateFieldsYAML("module")
 }
@@ -144,9 +115,32 @@ func Dashboards() error {
 	return mage.KibanaDashboards("module")
 }
 
+// Config generates both the short/reference configs and populates the modules.d
+// directory.
+func Config() error {
+	return auditbeat.Config(auditbeat.ConfigTemplateGlob)
+}
+
+// Update is an alias for running fields, dashboards, config, includes.
+func Update() {
+	mg.SerialDeps(Fields, Dashboards, Config,
+		mage.GenerateModuleIncludeListGo, Docs)
+}
+
 // Docs collects the documentation.
 func Docs() {
-	mg.Deps(auditbeat.ModuleDocs, auditbeat.FieldDocs)
+	mg.SerialDeps(xpackFields, combinedDocs)
+}
+
+// combinedDocs builds combined documentation for both OSS and X-Pack.
+func combinedDocs() error {
+	return auditbeat.CollectDocs(mage.OSSBeatDir(), auditbeat.XpackBeatDir())
+}
+
+// xpackFields creates x-pack/auditbeat/fields.yml - necessary to build
+// a combined documentation.
+func xpackFields() error {
+	return mage.Mage(auditbeat.XpackBeatDir(), "fields")
 }
 
 // Fmt formats source code and adds file headers.
@@ -175,7 +169,6 @@ func UnitTest() {
 // Use TEST_COVERAGE=true to enable code coverage profiling.
 // Use RACE_DETECTOR=true to enable the race detector.
 func GoUnitTest(ctx context.Context) error {
-	mg.Deps(Fields)
 	return mage.GoTest(ctx, mage.DefaultGoTestUnitArgs())
 }
 
@@ -183,7 +176,6 @@ func GoUnitTest(ctx context.Context) error {
 // Use TEST_COVERAGE=true to enable code coverage profiling.
 // Use RACE_DETECTOR=true to enable the race detector.
 func GoIntegTest(ctx context.Context) error {
-	mg.Deps(Fields)
 	return mage.RunIntegTest("goIntegTest", func() error {
 		return mage.GoTest(ctx, mage.DefaultGoTestIntegrationArgs())
 	})

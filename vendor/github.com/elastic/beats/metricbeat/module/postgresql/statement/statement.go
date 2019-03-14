@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/postgresql"
 
@@ -51,6 +52,8 @@ type MetricSet struct {
 // New creates a new instance of the MetricSet. New is responsible for unpacking
 // any MetricSet specific configuration options if there are any.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	cfgwarn.Beta("The statement metricset is beta")
+
 	config := struct{}{}
 	if err := base.Module().UnpackConfig(&config); err != nil {
 		return nil, err

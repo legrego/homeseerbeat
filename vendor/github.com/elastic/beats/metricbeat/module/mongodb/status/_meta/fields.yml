@@ -5,13 +5,11 @@
   release: ga
   fields:
     - name: version
-      type: alias
-      path: service.version
+      type: keyword
       description: >
         Instance version.
     - name: process
-      type: alias
-      path: process.name
+      type: keyword
       description: >
         The current MongoDB process. Possible values are mongos or mongod.
     - name: uptime.ms

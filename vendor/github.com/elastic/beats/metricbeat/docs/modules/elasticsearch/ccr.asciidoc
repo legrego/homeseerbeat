@@ -5,6 +5,8 @@ This file is generated! See scripts/docs_collector.py
 [[metricbeat-metricset-elasticsearch-ccr]]
 === Elasticsearch ccr metricset
 
+beta[]
+
 include::../../../module/elasticsearch/ccr/_meta/docs.asciidoc[]
 
 

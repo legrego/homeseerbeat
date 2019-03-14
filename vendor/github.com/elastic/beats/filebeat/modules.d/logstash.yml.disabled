@@ -1,6 +1,3 @@
-# Module: logstash
-# Docs: https://www.elastic.co/guide/en/beats/filebeat/master/filebeat-module-logstash.html
-
 - module: logstash
   # logs
   log:

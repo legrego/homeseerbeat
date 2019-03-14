@@ -151,18 +151,14 @@ func TestRetrieveGCEMetadata(t *testing.T) {
 	}
 
 	expected := common.MapStr{
-		"cloud": common.MapStr{
-			"provider": "gce",
-			"instance": common.MapStr{
-				"id":   "3910564293633576924",
-				"name": "test-gce-dev",
-			},
-			"machine": common.MapStr{
-				"type": "projects/111111111111/machineTypes/f1-micro",
-			},
-			"availability_zone": "projects/111111111111/zones/us-east1-b",
-			"project": common.MapStr{
-				"id": "test-dev",
+		"meta": common.MapStr{
+			"cloud": common.MapStr{
+				"provider":          "gce",
+				"instance_id":       "3910564293633576924",
+				"instance_name":     "test-gce-dev",
+				"machine_type":      "projects/111111111111/machineTypes/f1-micro",
+				"availability_zone": "projects/111111111111/zones/us-east1-b",
+				"project_id":        "test-dev",
 			},
 		},
 	}

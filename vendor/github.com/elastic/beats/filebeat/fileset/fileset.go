@@ -34,28 +34,20 @@ import (
 	"strings"
 	"text/template"
 
-	errw "github.com/pkg/errors"
-
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/logp"
 	mlimporter "github.com/elastic/beats/libbeat/ml-importer"
 )
 
 // Fileset struct is the representation of a fileset.
 type Fileset struct {
-	name        string
-	mcfg        *ModuleConfig
-	fcfg        *FilesetConfig
-	modulePath  string
-	manifest    *manifest
-	vars        map[string]interface{}
-	pipelineIDs []string
-}
-
-type pipeline struct {
-	id       string
-	contents map[string]interface{}
+	name       string
+	mcfg       *ModuleConfig
+	fcfg       *FilesetConfig
+	modulePath string
+	manifest   *manifest
+	vars       map[string]interface{}
+	pipelineID string
 }
 
 // New allocates a new Fileset object with the given configuration.
@@ -91,12 +83,12 @@ func (fs *Fileset) Read(beatVersion string) error {
 		return err
 	}
 
-	fs.vars, err = fs.evaluateVars(beatVersion)
+	fs.vars, err = fs.evaluateVars()
 	if err != nil {
 		return err
 	}
 
-	fs.pipelineIDs, err = fs.getPipelineIDs(beatVersion)
+	fs.pipelineID, err = fs.getPipelineID(beatVersion)
 	if err != nil {
 		return err
 	}
@@ -109,8 +101,9 @@ func (fs *Fileset) Read(beatVersion string) error {
 type manifest struct {
 	ModuleVersion   string                   `config:"module_version"`
 	Vars            []map[string]interface{} `config:"var"`
-	IngestPipeline  []string                 `config:"ingest_pipeline"`
+	IngestPipeline  string                   `config:"ingest_pipeline"`
 	Input           string                   `config:"input"`
+	Prospector      string                   `config:"prospector"`
 	MachineLearning []struct {
 		Name       string `config:"name"`
 		Job        string `config:"job"`
@@ -123,16 +116,14 @@ type manifest struct {
 }
 
 func newManifest(cfg *common.Config) (*manifest, error) {
-	if err := cfgwarn.CheckRemoved6xSetting(cfg, "prospector"); err != nil {
-		return nil, err
-	}
-
 	var manifest manifest
 	err := cfg.Unpack(&manifest)
 	if err != nil {
 		return nil, err
 	}
-
+	if manifest.Prospector != "" {
+		manifest.Input = manifest.Prospector
+	}
 	return &manifest, nil
 }
 
@@ -157,10 +148,10 @@ func (fs *Fileset) readManifest() (*manifest, error) {
 }
 
 // evaluateVars resolves the fileset variables.
-func (fs *Fileset) evaluateVars(beatVersion string) (map[string]interface{}, error) {
+func (fs *Fileset) evaluateVars() (map[string]interface{}, error) {
 	var err error
 	vars := map[string]interface{}{}
-	vars["builtin"], err = fs.getBuiltinVars(beatVersion)
+	vars["builtin"], err = fs.getBuiltinVars()
 	if err != nil {
 		return nil, err
 	}
@@ -271,14 +262,7 @@ func applyTemplate(vars map[string]interface{}, templateString string, specialDe
 	if specialDelims {
 		tpl = tpl.Delims("{<", ">}")
 	}
-
-	tplFunctions, err := getTemplateFunctions(vars)
-	if err != nil {
-		return "", errw.Wrap(err, "error fetching template functions")
-	}
-	tpl = tpl.Funcs(tplFunctions)
-
-	tpl, err = tpl.Parse(templateString)
+	tpl, err := tpl.Parse(templateString)
 	if err != nil {
 		return "", fmt.Errorf("Error parsing template %s: %v", templateString, err)
 	}
@@ -290,27 +274,9 @@ func applyTemplate(vars map[string]interface{}, templateString string, specialDe
 	return buf.String(), nil
 }
 
-func getTemplateFunctions(vars map[string]interface{}) (template.FuncMap, error) {
-	builtinVars, ok := vars["builtin"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("error fetching built-in vars as a dictionary")
-	}
-
-	return template.FuncMap{
-		"IngestPipeline": func(shortID string) string {
-			return formatPipelineID(
-				builtinVars["module"].(string),
-				builtinVars["fileset"].(string),
-				shortID,
-				builtinVars["beatVersion"].(string),
-			)
-		},
-	}, nil
-}
-
 // getBuiltinVars computes the supported built in variables and groups them
 // in a dictionary
-func (fs *Fileset) getBuiltinVars(beatVersion string) (map[string]interface{}, error) {
+func (fs *Fileset) getBuiltinVars() (map[string]interface{}, error) {
 	host, err := os.Hostname()
 	if err != nil || len(host) == 0 {
 		return nil, fmt.Errorf("Error getting the hostname: %v", err)
@@ -323,11 +289,8 @@ func (fs *Fileset) getBuiltinVars(beatVersion string) (map[string]interface{}, e
 	}
 
 	return map[string]interface{}{
-		"hostname":    hostname,
-		"domain":      domain,
-		"module":      fs.mcfg.Module,
-		"fileset":     fs.name,
-		"beatVersion": beatVersion,
+		"hostname": hostname,
+		"domain":   domain,
 	}, nil
 }
 
@@ -364,11 +327,7 @@ func (fs *Fileset) getInputConfig() (*common.Config, error) {
 	}
 
 	// force our pipeline ID
-	rootPipelineID := ""
-	if len(fs.pipelineIDs) > 0 {
-		rootPipelineID = fs.pipelineIDs[0]
-	}
-	err = cfg.SetString("pipeline", -1, rootPipelineID)
+	err = cfg.SetString("pipeline", -1, fs.pipelineID)
 	if err != nil {
 		return nil, fmt.Errorf("Error setting the pipeline ID in the input config: %v", err)
 	}
@@ -388,60 +347,43 @@ func (fs *Fileset) getInputConfig() (*common.Config, error) {
 	return cfg, nil
 }
 
-// getPipelineIDs returns the Ingest Node pipeline IDs
-func (fs *Fileset) getPipelineIDs(beatVersion string) ([]string, error) {
-	var pipelineIDs []string
-	for _, ingestPipeline := range fs.manifest.IngestPipeline {
-		path, err := applyTemplate(fs.vars, ingestPipeline, false)
-		if err != nil {
-			return nil, fmt.Errorf("Error expanding vars on the ingest pipeline path: %v", err)
-		}
-
-		pipelineIDs = append(pipelineIDs, formatPipelineID(fs.mcfg.Module, fs.name, path, beatVersion))
+// getPipelineID returns the Ingest Node pipeline ID
+func (fs *Fileset) getPipelineID(beatVersion string) (string, error) {
+	path, err := applyTemplate(fs.vars, fs.manifest.IngestPipeline, false)
+	if err != nil {
+		return "", fmt.Errorf("Error expanding vars on the ingest pipeline path: %v", err)
 	}
 
-	return pipelineIDs, nil
+	return formatPipelineID(fs.mcfg.Module, fs.name, path, beatVersion), nil
 }
 
-// GetPipelines returns the JSON content of the Ingest Node pipeline that parses the logs.
-func (fs *Fileset) GetPipelines(esVersion common.Version) (pipelines []pipeline, err error) {
+// GetPipeline returns the JSON content of the Ingest Node pipeline that parses the logs.
+func (fs *Fileset) GetPipeline(esVersion common.Version) (pipelineID string, content map[string]interface{}, err error) {
+	path, err := applyTemplate(fs.vars, fs.manifest.IngestPipeline, false)
+	if err != nil {
+		return "", nil, fmt.Errorf("Error expanding vars on the ingest pipeline path: %v", err)
+	}
+
+	strContents, err := ioutil.ReadFile(filepath.Join(fs.modulePath, fs.name, path))
+	if err != nil {
+		return "", nil, fmt.Errorf("Error reading pipeline file %s: %v", path, err)
+	}
+
 	vars, err := fs.turnOffElasticsearchVars(fs.vars, esVersion)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
-	for idx, ingestPipeline := range fs.manifest.IngestPipeline {
-		path, err := applyTemplate(fs.vars, ingestPipeline, false)
-		if err != nil {
-			return nil, fmt.Errorf("Error expanding vars on the ingest pipeline path: %v", err)
-		}
-
-		strContents, err := ioutil.ReadFile(filepath.Join(fs.modulePath, fs.name, path))
-		if err != nil {
-			return nil, fmt.Errorf("Error reading pipeline file %s: %v", path, err)
-		}
-
-		jsonString, err := applyTemplate(vars, string(strContents), true)
-		if err != nil {
-			return nil, fmt.Errorf("Error interpreting the template of the ingest pipeline: %v", err)
-		}
-
-		var content map[string]interface{}
-		err = json.Unmarshal([]byte(jsonString), &content)
-		if err != nil {
-			return nil, fmt.Errorf("Error JSON decoding the pipeline file: %s: %v", path, err)
-		}
-
-		pipelineID := fs.pipelineIDs[idx]
-
-		p := pipeline{
-			pipelineID,
-			content,
-		}
-		pipelines = append(pipelines, p)
+	jsonString, err := applyTemplate(vars, string(strContents), true)
+	if err != nil {
+		return "", nil, fmt.Errorf("Error interpreting the template of the ingest pipeline: %v", err)
 	}
 
-	return pipelines, nil
+	err = json.Unmarshal([]byte(jsonString), &content)
+	if err != nil {
+		return "", nil, fmt.Errorf("Error JSON decoding the pipeline file: %s: %v", path, err)
+	}
+	return fs.pipelineID, content, nil
 }
 
 // formatPipelineID generates the ID to be used for the pipeline ID in Elasticsearch
@@ -472,7 +414,7 @@ func (fs *Fileset) GetMLConfigs() []mlimporter.MLConfig {
 	var mlConfigs []mlimporter.MLConfig
 	for _, ml := range fs.manifest.MachineLearning {
 		mlConfigs = append(mlConfigs, mlimporter.MLConfig{
-			ID:           fmt.Sprintf("filebeat-%s-%s-%s_ecs", fs.mcfg.Module, fs.name, ml.Name),
+			ID:           fmt.Sprintf("filebeat-%s-%s-%s", fs.mcfg.Module, fs.name, ml.Name),
 			JobPath:      filepath.Join(fs.modulePath, fs.name, ml.Job),
 			DatafeedPath: filepath.Join(fs.modulePath, fs.name, ml.Datafeed),
 			MinVersion:   ml.MinVersion,

@@ -44,7 +44,7 @@ func TestExportTimezone(t *testing.T) {
 	actual := getActualValue(t, testConfig, input)
 
 	expected := common.MapStr{
-		"event": map[string]string{
+		"beat": map[string]string{
 			"timezone": zone,
 		},
 	}

@@ -18,7 +18,6 @@
 package tcp
 
 import (
-	"bufio"
 	"fmt"
 	"math/rand"
 	"net"
@@ -34,6 +33,7 @@ import (
 )
 
 var defaultConfig = Config{
+	LineDelimiter:  "\n",
 	Timeout:        time.Minute * 5,
 	MaxMessageSize: 20 * humanize.MiByte,
 }
@@ -44,7 +44,11 @@ type info struct {
 }
 
 func TestErrorOnEmptyLineDelimiter(t *testing.T) {
-	c := common.NewConfig()
+	cfg := map[string]interface{}{
+		"line_delimiter": "",
+	}
+
+	c, _ := common.NewConfigFrom(cfg)
 	config := defaultConfig
 	err := c.Unpack(&config)
 	assert.Error(t, err)
@@ -57,83 +61,85 @@ func TestReceiveEventsAndMetadata(t *testing.T) {
 	tests := []struct {
 		name             string
 		cfg              map[string]interface{}
-		splitFunc        bufio.SplitFunc
 		expectedMessages []string
 		messageSent      string
 	}{
 		{
 			name:             "NewLine",
 			cfg:              map[string]interface{}{},
-			splitFunc:        SplitFunc([]byte("\n")),
 			expectedMessages: expectedMessages,
 			messageSent:      strings.Join(expectedMessages, "\n"),
 		},
 		{
 			name:             "NewLineWithCR",
 			cfg:              map[string]interface{}{},
-			splitFunc:        SplitFunc([]byte("\r\n")),
 			expectedMessages: expectedMessages,
 			messageSent:      strings.Join(expectedMessages, "\r\n"),
 		},
 		{
-			name:             "CustomDelimiter",
-			cfg:              map[string]interface{}{},
-			splitFunc:        SplitFunc([]byte(";")),
+			name: "CustomDelimiter",
+			cfg: map[string]interface{}{
+				"line_delimiter": ";",
+			},
 			expectedMessages: expectedMessages,
 			messageSent:      strings.Join(expectedMessages, ";"),
 		},
 		{
-			name:             "MultipleCharsCustomDelimiter",
-			cfg:              map[string]interface{}{},
-			splitFunc:        SplitFunc([]byte("<END>")),
+			name: "MultipleCharsCustomDelimiter",
+			cfg: map[string]interface{}{
+				"line_delimiter": "<END>",
+			},
 			expectedMessages: expectedMessages,
 			messageSent:      strings.Join(expectedMessages, "<END>"),
 		},
 		{
-			name:             "SingleCharCustomDelimiterMessageWithoutBoundaries",
-			cfg:              map[string]interface{}{},
-			splitFunc:        SplitFunc([]byte(";")),
+			name: "SingleCharCustomDelimiterMessageWithoutBoundaries",
+			cfg: map[string]interface{}{
+				"line_delimiter": ";",
+			},
 			expectedMessages: []string{"hello"},
 			messageSent:      "hello",
 		},
 		{
-			name:             "MultipleCharCustomDelimiterMessageWithoutBoundaries",
-			cfg:              map[string]interface{}{},
-			splitFunc:        SplitFunc([]byte("<END>")),
+			name: "MultipleCharCustomDelimiterMessageWithoutBoundaries",
+			cfg: map[string]interface{}{
+				"line_delimiter": "<END>",
+			},
 			expectedMessages: []string{"hello"},
 			messageSent:      "hello",
 		},
 		{
-			name:             "NewLineMessageWithoutBoundaries",
-			cfg:              map[string]interface{}{},
-			splitFunc:        SplitFunc([]byte("\n")),
+			name: "NewLineMessageWithoutBoundaries",
+			cfg: map[string]interface{}{
+				"line_delimiter": "\n",
+			},
 			expectedMessages: []string{"hello"},
 			messageSent:      "hello",
 		},
 		{
-			name:             "NewLineLargeMessagePayload",
-			cfg:              map[string]interface{}{},
-			splitFunc:        SplitFunc([]byte("\n")),
+			name: "NewLineLargeMessagePayload",
+			cfg: map[string]interface{}{
+				"line_delimiter": "\n",
+			},
 			expectedMessages: largeMessages,
 			messageSent:      strings.Join(largeMessages, "\n"),
 		},
 		{
-			name:             "CustomLargeMessagePayload",
-			cfg:              map[string]interface{}{},
-			splitFunc:        SplitFunc([]byte(";")),
+			name: "CustomLargeMessagePayload",
+			cfg: map[string]interface{}{
+				"line_delimiter": ";",
+			},
 			expectedMessages: largeMessages,
 			messageSent:      strings.Join(largeMessages, ";"),
 		},
 		{
 			name:             "MaxReadBufferReached",
 			cfg:              map[string]interface{}{},
-			splitFunc:        SplitFunc([]byte("\n")),
 			expectedMessages: []string{},
 			messageSent:      randomString(900000),
 		},
 		{
-			name:      "MaxReadBufferReachedUserConfigured",
-			splitFunc: SplitFunc([]byte("\n")),
+			name: "MaxReadBufferReachedUserConfigured",
 			cfg: map[string]interface{}{
 				"max_read_message": 50000,
 			},
@@ -156,7 +162,7 @@ func TestReceiveEventsAndMetadata(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			server, err := New(&config, test.splitFunc, to)
+			server, err := New(&config, to)
 			if !assert.NoError(t, err) {
 				return
 			}
@@ -206,7 +212,7 @@ func TestReceiveNewEventsConcurrently(t *testing.T) {
 	if !assert.NoError(t, err) {
 		return
 	}
-	server, err := New(&config, bufio.ScanLines, to)
+	server, err := New(&config, to)
 	if !assert.NoError(t, err) {
 		return
 	}

@@ -35,7 +35,6 @@ type httpConfig struct {
 	HideKeywords           []string `config:"hide_keywords"`
 	RedactAuthorization    bool     `config:"redact_authorization"`
 	MaxMessageSize         int      `config:"max_message_size"`
-	DecodeBody             bool     `config:"decode_body"`
 }
 
 var (
@@ -44,6 +43,5 @@ var (
 			TransactionTimeout: protos.DefaultTransactionExpiration,
 		},
 		MaxMessageSize: tcp.TCPMaxDataInStream,
-		DecodeBody:     true,
 	}
 )

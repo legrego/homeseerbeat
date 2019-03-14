@@ -21,8 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/beats/libbeat/common/mapval"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -30,7 +28,7 @@ import (
 )
 
 func TestMonitor(t *testing.T) {
-	serverMonConf := mockPluginConf(t, "", "@every 1ms", "http://example.net")
+	serverMonConf := mockPluginConf(t, "@every 1ms", "http://example.net")
 	reg := mockPluginsReg()
 	pipelineConnector := &MockPipelineConnector{}
 
@@ -39,10 +37,11 @@ func TestMonitor(t *testing.T) {
 	require.NoError(t, err)
 	defer sched.Stop()
 
-	mon, err := newMonitor(serverMonConf, reg, pipelineConnector, sched, false, nil)
+	mon, err := newMonitor(serverMonConf, reg, pipelineConnector, sched, false)
 	require.NoError(t, err)
 
 	mon.Start()
+	defer mon.Stop()
 
 	require.Equal(t, 1, len(pipelineConnector.clients))
 	pcClient := pipelineConnector.clients[0]
@@ -54,13 +53,6 @@ func TestMonitor(t *testing.T) {
 		count := len(pcClient.Publishes())
 		if count >= 1 {
 			success = true
-
-			mon.Stop()
-			pcClient.Close()
-
-			for _, event := range pcClient.Publishes() {
-				mapval.Test(t, mockEventMonitorValidator(""), event.Fields)
-			}
 		} else {
 			// Let's yield this goroutine so we don't spin
 			// This could (possibly?) lock on a single core system otherwise
@@ -74,28 +66,4 @@ func TestMonitor(t *testing.T) {
 
 	mon.Stop()
 	assert.Equal(t, true, pcClient.closed)
-}
-
-func TestDuplicateMonitorIDs(t *testing.T) {
-	serverMonConf := mockPluginConf(t, "custom", "@every 1ms", "http://example.net")
-	reg := mockPluginsReg()
-	pipelineConnector := &MockPipelineConnector{}
-
-	sched := scheduler.New(1)
-	err := sched.Start()
-	require.NoError(t, err)
-	defer sched.Stop()
-
-	makeTestMon := func() (*Monitor, error) {
-		return newMonitor(serverMonConf, reg, pipelineConnector, sched, false, nil)
-	}
-
-	m1, m1Err := makeTestMon()
-	assert.NoError(t, m1Err)
-	_, m2Err := makeTestMon()
-	assert.Error(t, m2Err)
-
-	m1.Stop()
-	_, m3Err := makeTestMon()
-	assert.NoError(t, m3Err)
 }

@@ -7,12 +7,12 @@
       type: keyword
       description: >
         Specifies what component of Icinga logged the message.
-
     - name: severity
-      type: alias
-      path: log.level
-      migration: true
+      type: keyword
+      description: >
+        Possible values are "debug", "notice", "information", "warning" or
+        "critical".
     - name: message
-      type: alias
-      path: message
-      migration: true
+      type: text
+      description: >
+        The logged message.

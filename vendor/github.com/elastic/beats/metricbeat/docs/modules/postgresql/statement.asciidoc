@@ -5,6 +5,8 @@ This file is generated! See scripts/docs_collector.py
 [[metricbeat-metricset-postgresql-statement]]
 === PostgreSQL statement metricset
 
+beta[]
+
 include::../../../module/postgresql/statement/_meta/docs.asciidoc[]
 
 

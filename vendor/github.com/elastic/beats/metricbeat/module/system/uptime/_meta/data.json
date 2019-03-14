@@ -1,24 +1,18 @@
 {
     "@timestamp": "2017-10-12T08:05:34.853Z",
-    "agent": {
+    "beat": {
         "hostname": "host.example.com",
         "name": "host.example.com"
     },
-    "event": {
-        "dataset": "system.uptime",
-        "duration": 115000,
-        "module": "system"
-    },
     "metricset": {
-        "name": "uptime"
-    },
-    "service": {
-        "type": "system"
+        "module": "system",
+        "name": "uptime",
+        "rtt": 115
     },
     "system": {
         "uptime": {
             "duration": {
-                "ms": 1295582000
+                "ms": 522806000
             }
         }
     }

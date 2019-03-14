@@ -5,7 +5,6 @@ set -e
 name=$1
 path=$2
 build_dir=$3
-resource_dir=$4
 
 docs_dir=$build_dir/docs
 html_dir=$build_dir/html_docs
@@ -30,12 +29,7 @@ do
   mkdir -p "$dest_dir"
   params="--chunk=1"
   if [ "$PREVIEW" = "1" ]; then
-    params="$params --open"
+    params="--chunk=1 -open chunk=1 -open"
   fi
-
-  if [ -d "$resource_dir" ]; then
-    params="$params --resource=${resource_dir}"
-  fi
-
   $docs_dir/build_docs.pl $params --doc "$index" -out "$dest_dir"
 done

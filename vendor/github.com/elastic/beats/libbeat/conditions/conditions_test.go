@@ -105,12 +105,9 @@ var httpResponseTestEvent = &beat.Event{
 }
 
 func testConfig(t *testing.T, expected bool, event *beat.Event, config *Config) {
-	t.Helper()
-	logp.TestingSetup()
 	cond, err := NewCondition(config)
-	if assert.NoError(t, err) {
-		assert.Equal(t, expected, cond.Check(event))
-	}
+	assert.Nil(t, err)
+	assert.Equal(t, expected, cond.Check(event))
 }
 
 func TestCombinedCondition(t *testing.T) {

@@ -1,15 +1,16 @@
-FROM golang:1.11.5
+FROM golang:1.10.8
+MAINTAINER Nicolas Ruflin <ruflin@elastic.co>
 
-RUN \
-    apt-get update \
-      && apt-get install -y --no-install-recommends \
-         netcat \
-         python-pip \
-         rsync \
-         virtualenv \
-         libpcap-dev \
-      && rm -rf /var/lib/apt/lists/*
+RUN set -x && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+         netcat python-pip rsync virtualenv libpcap-dev && \
+    apt-get clean
 
-RUN pip install --upgrade pip
 RUN pip install --upgrade setuptools
-RUN pip install --upgrade docker-compose==1.23.2
+
+# Setup work environment
+ENV FILEBEAT_PATH /go/src/github.com/elastic/beats/filebeat
+
+RUN mkdir -p $FILEBEAT_PATH/build/coverage
+WORKDIR $FILEBEAT_PATH

@@ -9,7 +9,3 @@
       description: >
         Fields from the MySQL log files.
       fields:
-        - name: thread_id
-          type: long
-          description: >
-            The connection or thread ID for the query.

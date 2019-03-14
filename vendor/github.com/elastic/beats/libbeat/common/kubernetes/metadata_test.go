@@ -27,7 +27,7 @@ import (
 	"github.com/elastic/beats/libbeat/common"
 )
 
-func TestPodMetadata(t *testing.T) {
+func TestPodMetadataDeDot(t *testing.T) {
 	UID := "005f3b90-4b9d-12f8-acf0-31020a840133"
 	Deployment := "Deployment"
 	test := "test"
@@ -35,8 +35,9 @@ func TestPodMetadata(t *testing.T) {
 	True := true
 	False := false
 	tests := []struct {
-		pod  *Pod
-		meta common.MapStr
+		pod    *Pod
+		meta   common.MapStr
+		config *common.Config
 	}{
 		{
 			pod: &Pod{
@@ -58,6 +59,7 @@ func TestPodMetadata(t *testing.T) {
 				"namespace": "test",
 				"labels":    common.MapStr{"a": common.MapStr{"value": "bar", "key": "foo"}},
 			},
+			config: common.NewConfig(),
 		},
 		{
 			pod: &Pod{
@@ -90,97 +92,12 @@ func TestPodMetadata(t *testing.T) {
 				"labels":     common.MapStr{"a": common.MapStr{"value": "bar", "key": "foo"}},
 				"deployment": common.MapStr{"name": "test"},
 			},
+			config: common.NewConfig(),
 		},
 	}
 
 	for _, test := range tests {
-		config, err := common.NewConfigFrom(map[string]interface{}{
-			"labels.dedot":        false,
-			"annotations.dedot":   false,
-			"include_annotations": []string{"b", "b.key"},
-		})
-
-		metaGen, err := NewMetaGenerator(config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, metaGen.PodMetadata(test.pod), test.meta)
-	}
-}
-
-func TestPodMetadataDeDot(t *testing.T) {
-	UID := "005f3b90-4b9d-12f8-acf0-31020a840133"
-	Deployment := "Deployment"
-	test := "test"
-	ReplicaSet := "ReplicaSet"
-	True := true
-	False := false
-	tests := []struct {
-		pod  *Pod
-		meta common.MapStr
-	}{
-		{
-			pod: &Pod{
-				Metadata: &metav1.ObjectMeta{
-					Labels:      map[string]string{"a.key": "foo", "a": "bar"},
-					Uid:         &UID,
-					Namespace:   &test,
-					Annotations: map[string]string{"b.key": "foo", "b": "bar"},
-				},
-				Spec: &v1.PodSpec{
-					NodeName: &test,
-				},
-			},
-			meta: common.MapStr{
-				"pod": common.MapStr{
-					"name": "",
-					"uid":  "005f3b90-4b9d-12f8-acf0-31020a840133",
-				},
-				"node":        common.MapStr{"name": "test"},
-				"namespace":   "test",
-				"labels":      common.MapStr{"a": "bar", "a_key": "foo"},
-				"annotations": common.MapStr{"b": "bar", "b_key": "foo"},
-			},
-		},
-		{
-			pod: &Pod{
-				Metadata: &metav1.ObjectMeta{
-					Labels: map[string]string{"a.key": "foo", "a": "bar"},
-					Uid:    &UID,
-					OwnerReferences: []*metav1.OwnerReference{
-						{
-							Kind:       &Deployment,
-							Name:       &test,
-							Controller: &True,
-						},
-						{
-							Kind:       &ReplicaSet,
-							Name:       &ReplicaSet,
-							Controller: &False,
-						},
-					},
-				},
-				Spec: &v1.PodSpec{
-					NodeName: &test,
-				},
-			},
-			meta: common.MapStr{
-				"pod": common.MapStr{
-					"name": "",
-					"uid":  "005f3b90-4b9d-12f8-acf0-31020a840133",
-				},
-				"node":       common.MapStr{"name": "test"},
-				"labels":     common.MapStr{"a": "bar", "a_key": "foo"},
-				"deployment": common.MapStr{"name": "test"},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		config, err := common.NewConfigFrom(map[string]interface{}{
-			"include_annotations": []string{"b", "b.key"},
-		})
-		metaGen, err := NewMetaGenerator(config)
+		metaGen, err := NewMetaGenerator(test.config)
 		if err != nil {
 			t.Fatal(err)
 		}

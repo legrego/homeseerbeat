@@ -18,12 +18,8 @@
 package pq
 
 import (
-	"time"
-
 	"github.com/elastic/go-txfile"
 	"github.com/elastic/go-txfile/internal/cleanup"
-	"github.com/elastic/go-txfile/internal/invariant"
-	"github.com/elastic/go-txfile/txerr"
 )
 
 // Writer is used to push new events onto the queue.
@@ -33,9 +29,6 @@ import (
 // the write buffer will grow with the event size.
 type Writer struct {
 	active bool
-
-	hdrOffset uintptr
-	observer  Observer
 
 	accessor *access
 	flushCB  func(uint)
@@ -52,19 +45,12 @@ type writeState struct {
 
 	eventID    uint64
 	eventBytes int
-
-	activeEventBytes   uint
-	minEventSize       uint
-	maxEventSize       uint
-	tsOldest, tsNewest time.Time
 }
 
 const defaultMinPages = 5
 
 func newWriter(
 	accessor *access,
-	off uintptr,
-	o Observer,
 	pagePool *pagePool,
 	writeBuffer uint,
 	end position,
@@ -81,9 +67,6 @@ func newWriter(
 	if pages <= defaultMinPages {
 		pages = defaultMinPages
 	}
-
-	tracef("create queue writer with initBufferSize=%v, actualBufferSize=%v, pageSize=%v, pages=%v\n",
-		writeBuffer, pageSize*pages, pageSize, pages)
 
 	var tail *page
 	if end.page != 0 {
@@ -102,10 +85,8 @@ func newWriter(
 	}
 
 	w := &Writer{
-		active:    true,
-		hdrOffset: off,
-		observer:  o,
-		accessor:  accessor,
+		active:   true,
+		accessor: accessor,
 		state: writeState{
 			buf:     newBuffer(pagePool, tail, pages, pageSize, szEventPageHeader),
 			eventID: end.id,
@@ -125,7 +106,7 @@ func (w *Writer) close() error {
 		return nil
 	}
 
-	err := w.flushBuffer()
+	err := w.doFlush()
 	if err != nil {
 		return w.errWrap(op, err)
 	}
@@ -143,7 +124,7 @@ func (w *Writer) Write(p []byte) (int, error) {
 	}
 
 	if w.state.buf.Avail() <= len(p) {
-		if err := w.flushBuffer(); err != nil {
+		if err := w.doFlush(); err != nil {
 			return 0, w.errWrap(op, err)
 		}
 	}
@@ -170,32 +151,13 @@ func (w *Writer) Next() error {
 	hdr.sz.Set(uint32(w.state.eventBytes))
 	w.state.buf.CommitEvent(w.state.eventID)
 	w.state.buf.ReserveHdr(szEventHeader)
-
-	sz := uint(w.state.eventBytes)
-	ts := time.Now()
-	w.state.activeEventBytes += sz
-	if w.state.activeEventCount == 0 {
-		w.state.minEventSize = sz
-		w.state.maxEventSize = sz
-		w.state.tsOldest = ts
-		w.state.tsNewest = ts
-	} else {
-		if sz < w.state.minEventSize {
-			w.state.minEventSize = sz
-		}
-		if sz > w.state.maxEventSize {
-			w.state.maxEventSize = sz
-		}
-		w.state.tsNewest = ts
-	}
-
 	w.state.eventBytes = 0
 	w.state.eventID++
 	w.state.activeEventCount++
 
 	// check if we need to flush
 	if w.state.buf.Avail() <= szEventHeader {
-		if err := w.flushBuffer(); err != nil {
+		if err := w.doFlush(); err != nil {
 			return w.errWrap(op, err)
 		}
 	}
@@ -212,94 +174,40 @@ func (w *Writer) Flush() error {
 		return w.errOf(op, err)
 	}
 
-	if err := w.flushBuffer(); err != nil {
+	if err := w.doFlush(); err != nil {
 		return w.errWrap(op, err)
 	}
-	return nil
-}
-
-func (w *Writer) flushBuffer() error {
-	activeEventCount := w.state.activeEventCount
-
-	start := time.Now()
-	pages, allocated, err := w.doFlush()
-
-	if o := w.observer; o != nil {
-		failed := err != nil
-		o.OnQueueFlush(w.hdrOffset, FlushStats{
-			Duration: time.Since(start),
-			Oldest:   w.state.tsOldest,
-			Newest:   w.state.tsNewest,
-			Failed:   failed,
-			OutOfMemory: failed && (txerr.Is(txfile.OutOfMemory, err) ||
-				txerr.Is(txfile.NoDiskSpace, err)),
-			Pages:      pages,
-			Allocate:   allocated,
-			Events:     activeEventCount,
-			BytesTotal: w.state.activeEventBytes,
-			BytesMin:   w.state.minEventSize,
-			BytesMax:   w.state.maxEventSize,
-		})
-	}
-
-	if err != nil {
-		return err
-	}
-
-	// reset internal stats on success
-	w.state.totalEventCount += activeEventCount
-	w.state.totalAllocPages += allocated
-
-	traceln("Write buffer flushed. Total events: %v, total pages allocated: %v",
-		w.state.totalEventCount,
-		w.state.totalAllocPages)
-
-	w.state.activeEventCount = 0
-	w.state.activeEventBytes = 0
-	w.state.minEventSize = 0
-	w.state.maxEventSize = 0
-
-	if w.flushCB != nil {
-		w.flushCB(activeEventCount)
-	}
 
 	return nil
 }
 
-func (w *Writer) doFlush() (pages, allocated uint, err error) {
-	start, end, pages := w.state.buf.Pages()
+func (w *Writer) doFlush() error {
+	start, end := w.state.buf.Pages()
 	if start == nil || start == end {
-		return 0, 0, nil
+		return nil
 	}
 
 	traceln("writer flush", w.state.activeEventCount)
-	tracef("flush page range: start=%p, end=%p, n=%v\n", start, end, pages)
 
 	// unallocated points to first page in list that must be allocated.  All
 	// pages between unallocated and end require a new page to be allocated.
 	var unallocated *page
-	allocated = pages
 	for current := start; current != end; current = current.Next {
-		tracef("check page assigned: %p (%v)\n", current, current.Assigned())
-
 		if !current.Assigned() {
 			unallocated = current
 			break
 		}
-		allocated--
 	}
-
-	tracef("start allocating pages from %p (n=%v)\n", unallocated, allocated)
 
 	tx, txErr := w.accessor.BeginWrite()
 	if txErr != nil {
-		return pages, allocated, w.errWrap("", txErr)
+		return w.errWrap("", txErr)
 	}
 	defer tx.Close()
 
 	rootPage, queueHdr, err := w.accessor.LoadRootPage(tx)
 	if err != nil {
-		return pages, allocated, w.errWrap("", err)
+		return w.errWrap("", err)
 	}
 
 	traceQueueHeader(queueHdr)
@@ -307,19 +215,15 @@ func (w *Writer) doFlush() (pages, allocated uint, err error) {
 	ok := false
 	allocN, txErr := allocatePages(tx, unallocated, end)
 	if txErr != nil {
-		return pages, allocated, w.errWrap("", txErr)
+		return w.errWrap("", txErr)
 	}
-
-	traceln("allocated pages:", allocN)
-	invariant.Checkf(allocN == allocated, "allocation counter mismatch (expected=%v, actual=%v)", allocated, allocN)
-
 	linkPages(start, end)
 	defer cleanup.IfNot(&ok, func() { unassignPages(unallocated, end) })
 
 	traceln("write queue pages")
 	last, txErr := flushPages(tx, start, end)
 	if txErr != nil {
-		return pages, allocated, w.errWrap("", txErr)
+		return w.errWrap("", txErr)
 	}
 
 	// update queue root
@@ -328,7 +232,7 @@ func (w *Writer) doFlush() (pages, allocated uint, err error) {
 
 	txErr = tx.Commit()
 	if txErr != nil {
-		return pages, allocated, w.errWrap("", txErr)
+		return w.errWrap("", txErr)
 	}
 
 	// mark write as success -> no error-cleanup required
@@ -340,10 +244,24 @@ func (w *Writer) doFlush() (pages, allocated uint, err error) {
 	}
 
 	w.state.buf.Reset(last)
-	return pages, allocated, nil
+
+	activeEventCount := w.state.activeEventCount
+	w.state.totalEventCount += activeEventCount
+	w.state.totalAllocPages += uint(allocN)
+
+	traceln("Write buffer flushed. Total events: %v, total pages allocated: %v",
+		w.state.totalEventCount,
+		w.state.totalAllocPages)
+
+	w.state.activeEventCount = 0
+	if w.flushCB != nil {
+		w.flushCB(activeEventCount)
+	}
+
+	return nil
 }
 
-func (w *Writer) updateRootHdr(hdr *queuePage, start, last *page, allocated uint) {
+func (w *Writer) updateRootHdr(hdr *queuePage, start, last *page, allocated int) {
 	if hdr.head.offset.Get() == 0 {
 		w.accessor.WritePosition(&hdr.head, position{
 			page: start.Meta.ID,
@@ -395,19 +313,19 @@ func (w *Writer) errPageCtx(id txfile.PageID) errorCtx {
 	return w.accessor.errPageCtx(id)
 }
 
-func allocatePages(tx *txfile.Tx, start, end *page) (uint, error) {
+func allocatePages(tx *txfile.Tx, start, end *page) (int, error) {
 	if start == nil {
 		return 0, nil
 	}
 
-	var allocN uint
+	allocN := 0
 	for current := start; current != end; current = current.Next {
 		allocN++
 	}
 
 	tracef("allocate %v queue pages\n", allocN)
 
-	txPages, err := tx.AllocN(int(allocN))
+	txPages, err := tx.AllocN(allocN)
 	if err != nil {
 		return 0, err
 	}

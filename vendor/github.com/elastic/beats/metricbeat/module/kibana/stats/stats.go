@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/helper/elastic"
 	"github.com/elastic/beats/metricbeat/mb"
@@ -59,6 +60,8 @@ type MetricSet struct {
 
 // New create a new instance of the MetricSet
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	cfgwarn.Experimental("The " + base.FullyQualifiedName() + " metricset is experimental")
+
 	ms, err := kibana.NewMetricSet(base)
 	if err != nil {
 		return nil, err
@@ -74,7 +77,7 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 		return nil, err
 	}
 
-	isStatsAPIAvailable := kibana.IsStatsAPIAvailable(kibanaVersion)
+	isStatsAPIAvailable, err := kibana.IsStatsAPIAvailable(kibanaVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -85,13 +88,17 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	}
 
 	if ms.XPackEnabled {
+		cfgwarn.Experimental("The experimental xpack.enabled flag in the " + ms.FullyQualifiedName() + " metricset is enabled.")
+
 		// Use legacy API response so we can passthru usage as-is
 		statsHTTP.SetURI(statsHTTP.GetURI() + "&legacy=true")
 	}
 
 	var settingsHTTP *helper.HTTP
 	if ms.XPackEnabled {
-		isSettingsAPIAvailable := kibana.IsSettingsAPIAvailable(kibanaVersion)
+		cfgwarn.Experimental("The experimental xpack.enabled flag in the " + ms.FullyQualifiedName() + " metricset is enabled.")
+
+		isSettingsAPIAvailable, err := kibana.IsSettingsAPIAvailable(kibanaVersion)
 		if err != nil {
 			return nil, err
 		}

@@ -19,6 +19,7 @@ package osd_df
 
 import (
 	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
@@ -49,6 +50,8 @@ type MetricSet struct {
 }
 
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	cfgwarn.Experimental("The ceph osd_df metricset is experimental")
+
 	http, err := helper.NewHTTP(base)
 	if err != nil {
 		return nil, err

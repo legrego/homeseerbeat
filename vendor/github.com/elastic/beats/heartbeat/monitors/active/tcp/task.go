@@ -20,57 +20,55 @@ package tcp
 import (
 	"time"
 
-	"github.com/elastic/beats/heartbeat/eventext"
-	"github.com/elastic/beats/heartbeat/look"
-	"github.com/elastic/beats/heartbeat/reason"
-	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/outputs/transport"
+
+	"github.com/elastic/beats/heartbeat/look"
+	"github.com/elastic/beats/heartbeat/reason"
 )
 
 func pingHost(
-	event *beat.Event,
 	dialer transport.Dialer,
-	addr string,
+	host string,
 	timeout time.Duration,
 	validator ConnCheck,
-) error {
+) (common.MapStr, error) {
 	start := time.Now()
 	deadline := start.Add(timeout)
 
-	conn, err := dialer.Dial("tcp", addr)
+	conn, err := dialer.Dial("tcp", host)
 	if err != nil {
 		debugf("dial failed with: %v", err)
-		return reason.IOFailed(err)
+		return nil, reason.IOFailed(err)
 	}
 	defer conn.Close()
 	if validator == nil {
 		// no additional validation step => ping success
-		return nil
+		return common.MapStr{}, nil
 	}
 
 	if err := conn.SetDeadline(deadline); err != nil {
 		debugf("setting connection deadline failed with: %v", err)
-		return reason.IOFailed(err)
+		return nil, reason.IOFailed(err)
 	}
 
 	validateStart := time.Now()
 	err = validator.Validate(conn)
 	if err != nil && err != errRecvMismatch {
 		debugf("check failed with: %v", err)
-		return reason.IOFailed(err)
+		return nil, reason.IOFailed(err)
 	}
 
 	end := time.Now()
-	eventext.MergeEventFields(event, common.MapStr{
+	event := common.MapStr{
 		"tcp": common.MapStr{
 			"rtt": common.MapStr{
 				"validate": look.RTT(end.Sub(validateStart)),
 			},
 		},
-	})
-	if err != nil {
-		event.PutValue("error", reason.FailValidate(err))
 	}
-	return nil
+	if err != nil {
+		event["error"] = reason.FailValidate(err)
+	}
+	return event, nil
 }

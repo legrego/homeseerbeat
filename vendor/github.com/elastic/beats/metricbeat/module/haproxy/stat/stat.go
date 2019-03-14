@@ -18,6 +18,7 @@
 package stat
 
 import (
+	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/haproxy"
@@ -52,18 +53,16 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 }
 
 // Fetch methods returns a list of stats metrics.
-func (m *MetricSet) Fetch(r mb.ReporterV2) {
+func (m *MetricSet) Fetch() ([]common.MapStr, error) {
 	hapc, err := haproxy.NewHaproxyClient(m.HostData().URI)
 	if err != nil {
-		r.Error(errors.Wrap(err, "failed creating haproxy client"))
-		return
+		return nil, errors.Wrap(err, "failed creating haproxy client")
 	}
 
 	res, err := hapc.GetStat()
 	if err != nil {
-		r.Error(errors.Wrap(err, "failed fetching haproxy stat"))
-		return
+		return nil, errors.Wrap(err, "failed fetching haproxy stat")
 	}
 
-	eventMapping(res, r)
+	return eventMapping(res), nil
 }

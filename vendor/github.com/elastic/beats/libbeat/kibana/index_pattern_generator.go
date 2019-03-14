@@ -28,34 +28,47 @@ import (
 )
 
 type IndexPatternGenerator struct {
-	indexName   string
-	beatVersion string
-	fields      []byte
-	version     common.Version
-	migration   bool
+	indexName      string
+	beatVersion    string
+	fieldsYaml     string
+	version        common.Version
+	targetDir      string
+	targetFilename string
 }
 
 // Create an instance of the Kibana Index Pattern Generator
-func NewGenerator(indexName, beatName string, fields []byte, beatVersion string, version common.Version, migration bool) (*IndexPatternGenerator, error) {
+func NewGenerator(indexName, beatName, fieldsYAMLFile, outputDir, beatVersion string, version common.Version) (*IndexPatternGenerator, error) {
 	beatName = clean(beatName)
 
-	return &IndexPatternGenerator{
-		indexName:   indexName + "-*",
-		fields:      fields,
-		beatVersion: beatVersion,
-		version:     version,
-		migration:   migration,
-	}, nil
-}
-
-// Generate creates the Index-Pattern for Kibana.
-func (i *IndexPatternGenerator) Generate() (common.MapStr, error) {
-	idxPattern, err := i.generate()
-	if err != nil {
+	if _, err := os.Stat(fieldsYAMLFile); err != nil {
 		return nil, err
 	}
 
-	return i.generatePattern(idxPattern), nil
+	return &IndexPatternGenerator{
+		indexName:      indexName,
+		fieldsYaml:     fieldsYAMLFile,
+		beatVersion:    beatVersion,
+		version:        version,
+		targetDir:      createTargetDir(outputDir, version),
+		targetFilename: beatName + ".json",
+	}, nil
+}
+
+// Create the Index-Pattern for Kibana for 5.x and default.
+func (i *IndexPatternGenerator) Generate() (string, error) {
+	idxPattern, err := i.generate()
+	if err != nil {
+		return "", err
+	}
+
+	if i.version.Major >= 6 {
+		idxPattern = i.generateMinVersion6(idxPattern)
+	}
+
+	file := filepath.Join(i.targetDir, i.targetFilename)
+	err = dumpToFile(file, idxPattern)
+
+	return file, err
 }
 
 func (i *IndexPatternGenerator) generate() (common.MapStr, error) {
@@ -77,14 +90,14 @@ func (i *IndexPatternGenerator) generate() (common.MapStr, error) {
 	return indexPattern, nil
 }
 
-func (i *IndexPatternGenerator) generatePattern(attrs common.MapStr) common.MapStr {
+func (i *IndexPatternGenerator) generateMinVersion6(attrs common.MapStr) common.MapStr {
 	out := common.MapStr{
 		"version": i.beatVersion,
 		"objects": []common.MapStr{
 			common.MapStr{
 				"type":       "index-pattern",
 				"id":         i.indexName,
-				"version":    "1",
+				"version":    1,
 				"attributes": attrs,
 			},
 		},
@@ -94,7 +107,7 @@ func (i *IndexPatternGenerator) generatePattern(attrs common.MapStr) common.MapS
 }
 
 func (i *IndexPatternGenerator) addGeneral(indexPattern *common.MapStr) error {
-	kibanaEntries, err := loadKibanaEntriesFromYaml(i.fields)
+	kibanaEntries, err := loadKibanaEntriesFromYaml(i.fieldsYaml)
 	if err != nil {
 		return err
 	}
@@ -110,11 +123,11 @@ func (i *IndexPatternGenerator) addGeneral(indexPattern *common.MapStr) error {
 }
 
 func (i *IndexPatternGenerator) addFieldsSpecific(indexPattern *common.MapStr) error {
-	fields, err := common.LoadFields(i.fields)
+	fields, err := common.LoadFieldsYaml(i.fieldsYaml)
 	if err != nil {
 		return err
 	}
-	transformer, err := newFieldsTransformer(&i.version, fields, i.migration)
+	transformer, err := newFieldsTransformer(&i.version, fields)
 	if err != nil {
 		return err
 	}
@@ -163,5 +176,9 @@ func createTargetDir(baseDir string, version common.Version) string {
 }
 
 func getVersionPath(version common.Version) string {
-	return "7"
+	versionPath := "6"
+	if version.Major == 5 {
+		versionPath = "5"
+	}
+	return versionPath
 }

@@ -18,7 +18,8 @@
 package store
 
 import (
-	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
@@ -36,8 +37,6 @@ var (
 	}.Build()
 )
 
-var logger = logp.NewLogger("etcd.store")
-
 func init() {
 	mb.Registry.MustAddMetricSet("etcd", "store", New,
 		mb.WithHostParser(hostParser),
@@ -51,6 +50,8 @@ type MetricSet struct {
 }
 
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	cfgwarn.Beta("The etcd store metricset is beta")
+
 	config := struct{}{}
 	if err := base.Module().UnpackConfig(&config); err != nil {
 		return nil, err
@@ -66,18 +67,10 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	}, nil
 }
 
-// Fetch methods implements the data gathering and data conversion to the right
-// format. It publishes the event which is then forwarded to the output. In case
-// of an error set the Error field of mb.Event or simply call report.Error().
-func (m *MetricSet) Fetch(reporter mb.ReporterV2) {
+func (m *MetricSet) Fetch() (common.MapStr, error) {
 	content, err := m.http.FetchContent()
 	if err != nil {
-		logger.Error(err)
-		reporter.Error(err)
-		return
+		return nil, err
 	}
-
-	reporter.Event(mb.Event{
-		MetricSetFields: eventMapping(content),
-	})
+	return eventMapping(content), nil
 }

@@ -25,15 +25,33 @@ import (
 
 	"github.com/elastic/beats/libbeat/tests/compose"
 	mbtest "github.com/elastic/beats/metricbeat/mb/testing"
+
+	"github.com/stretchr/testify/assert"
 )
+
+// These tests are running with prometheus metrics as an example as this container is already available
+// Every prometheus exporter should work here.
+
+func TestFetch(t *testing.T) {
+	compose.EnsureUp(t, "prometheus")
+
+	f := mbtest.NewEventsFetcher(t, getConfig())
+	event, err := f.Fetch()
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+
+	t.Logf("%s/%s event: %+v", f.Module().Name(), f.Name(), event)
+}
 
 func TestData(t *testing.T) {
 	compose.EnsureUp(t, "prometheus")
 
-	ms := mbtest.NewReportingMetricSetV2(t, getConfig())
-	err := mbtest.WriteEventsReporterV2(ms, t, "")
+	f := mbtest.NewEventsFetcher(t, getConfig())
+
+	err := mbtest.WriteEvents(f, t)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("write", err)
 	}
 }
 

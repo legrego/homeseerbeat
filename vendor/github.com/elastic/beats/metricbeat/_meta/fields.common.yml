@@ -7,30 +7,50 @@
     - name: metricset.module
       description: >
         The name of the module that generated the event.
-      type: alias
-      path: event.module
-      migration: true
 
     - name: metricset.name
       description: >
         The name of the metricset that generated the event.
 
-    - name: process.pgid
-      type: long
+    - name: metricset.host
       description: >
-        Process group id.
-
-    - name: service.address
-      description: >
-        Address of the machine where the service is running. This
+        Hostname of the machine from which the metricset was collected. This
         field may not be present when the data was collected locally.
 
-    - name: service.hostname
+    - name: metricset.rtt
+      type: long
+      required: true
       description: >
-        Host name of the machine where the service is running.
+        Event round trip time in microseconds.
+      deprecated: true
+
+    - name: metricset.namespace
+      type: keyword
+      description: >
+        Namespace of dynamic metricsets.
 
     - name: type
       required: true
       example: metricsets
       description: >
         The document type. Always set to "doc".
+
+    - name: service.name
+      example: elasticsearch
+      description: >
+        Name of the service metricbeat fetches the data from.
+
+    - name: event.duration
+      type: long
+      description: >
+        Duration of the event in nano seconds.
+
+    - name: event.dataset
+      type: keyword
+      description: >
+        Event dataset name.
+
+    # Alias compatiblity fields
+    - name: event.module
+      type: alias
+      path: metricset.module

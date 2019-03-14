@@ -31,7 +31,7 @@ import (
 )
 
 // GenDashboardCmd is the command used to export a dashboard.
-func GenDashboardCmd(settings instance.Settings) *cobra.Command {
+func GenDashboardCmd(name, idxPrefix, beatVersion string) *cobra.Command {
 	genTemplateConfigCmd := &cobra.Command{
 		Use:   "dashboard",
 		Short: "Export defined dashboard to stdout",
@@ -40,12 +40,12 @@ func GenDashboardCmd(settings instance.Settings) *cobra.Command {
 			yml, _ := cmd.Flags().GetString("yml")
 			decode, _ := cmd.Flags().GetBool("decode")
 
-			b, err := instance.NewBeat(settings.Name, settings.IndexPrefix, settings.Version)
+			b, err := instance.NewBeat(name, idxPrefix, beatVersion)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error creating beat: %s\n", err)
 				os.Exit(1)
 			}
-			err = b.InitWithSettings(settings)
+			err = b.Init()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error initializing beat: %s\n", err)
 				os.Exit(1)
@@ -73,7 +73,6 @@ func GenDashboardCmd(settings instance.Settings) *cobra.Command {
 					if decode {
 						r = dashboards.DecodeExported(r)
 					}
-
 					err = dashboards.SaveToFile(r, info.Dashboards[i].File, filepath.Dir(yml), client.GetVersion())
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "Error saving dashboard '%s' to file '%s' : %+v\n",

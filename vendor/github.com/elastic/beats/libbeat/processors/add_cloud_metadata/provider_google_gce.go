@@ -32,22 +32,16 @@ func newGceMetadataFetcher(config *common.Config) (*metadataFetcher, error) {
 
 		if instance, ok := m["instance"].(map[string]interface{}); ok {
 			s.Schema{
-				"instance": s.Object{
-					"id":   c.StrFromNum("id"),
-					"name": c.Str("name"),
-				},
-				"machine": s.Object{
-					"type": c.Str("machineType"),
-				},
+				"instance_id":       c.StrFromNum("id"),
+				"instance_name":     c.Str("name"),
+				"machine_type":      c.Str("machineType"),
 				"availability_zone": c.Str("zone"),
 			}.ApplyTo(out, instance)
 		}
 
 		if project, ok := m["project"].(map[string]interface{}); ok {
 			s.Schema{
-				"project": s.Object{
-					"id": c.Str("projectId"),
-				},
+				"project_id": c.Str("projectId"),
 			}.ApplyTo(out, project)
 		}
 

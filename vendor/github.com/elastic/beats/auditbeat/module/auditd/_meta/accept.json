@@ -15,7 +15,6 @@
             "syscall": "accept",
             "tty": "(none)"
         },
-        "message_type": "syscall",
         "result": "success",
         "sequence": 8832,
         "session": "unset",
@@ -35,20 +34,18 @@
     "event": {
         "action": "accepted-connection-from",
         "category": "audit-rule",
-        "module": "auditd"
+        "module": "auditd",
+        "type": "syscall"
     },
     "network": {
         "direction": "incoming"
     },
     "process": {
-        "executable": "/usr/sbin/sshd",
+        "exe": "/usr/sbin/sshd",
         "name": "sshd",
-        "pid": 1663,
-        "ppid": 1,
+        "pid": "1663",
+        "ppid": "1",
         "title": "(sshd)"
-    },
-    "service": {
-        "type": "auditd"
     },
     "source": {
         "ip": "72.83.230.100",
@@ -58,38 +55,24 @@
         "net"
     ],
     "user": {
-        "audit": {
-            "id": "unset"
+        "auid": "unset",
+        "egid": "0",
+        "euid": "0",
+        "fsgid": "0",
+        "fsuid": "0",
+        "gid": "0",
+        "name_map": {
+            "egid": "root",
+            "euid": "root",
+            "fsgid": "root",
+            "fsuid": "root",
+            "gid": "root",
+            "sgid": "root",
+            "suid": "root",
+            "uid": "root"
         },
-        "effective": {
-            "group": {
-                "id": "0",
-                "name": "root"
-            },
-            "id": "0",
-            "name": "root"
-        },
-        "filesystem": {
-            "group": {
-                "id": "0",
-                "name": "root"
-            },
-            "id": "0",
-            "name": "root"
-        },
-        "group": {
-            "id": "0",
-            "name": "root"
-        },
-        "id": "0",
-        "name": "root",
-        "saved": {
-            "group": {
-                "id": "0",
-                "name": "root"
-            },
-            "id": "0",
-            "name": "root"
-        }
+        "sgid": "0",
+        "suid": "0",
+        "uid": "0"
     }
 }

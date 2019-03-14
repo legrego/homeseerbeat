@@ -23,7 +23,6 @@ import (
 	"github.com/elastic/beats/libbeat/common"
 	s "github.com/elastic/beats/libbeat/common/schema"
 	c "github.com/elastic/beats/libbeat/common/schema/mapstrstr"
-	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/haproxy"
 )
 
@@ -127,7 +126,9 @@ var (
 )
 
 // Map data to MapStr.
-func eventMapping(info []*haproxy.Stat, r mb.ReporterV2) {
+func eventMapping(info []*haproxy.Stat) []common.MapStr {
+	var events []common.MapStr
+
 	for _, evt := range info {
 		st := reflect.ValueOf(evt).Elem()
 		typeOfT := st.Type()
@@ -136,19 +137,12 @@ func eventMapping(info []*haproxy.Stat, r mb.ReporterV2) {
 		for i := 0; i < st.NumField(); i++ {
 			f := st.Field(i)
 			source[typeOfT.Field(i).Name] = f.Interface()
+
 		}
 
-		fields, _ := schema.Apply(source)
-		event := mb.Event{
-			RootFields: common.MapStr{},
-		}
-
-		if processID, err := fields.GetValue("process_id"); err == nil {
-			event.RootFields.Put("process.pid", processID)
-			fields.Delete("process_id")
-		}
-
-		event.MetricSetFields = fields
-		r.Event(event)
+		data, _ := schema.Apply(source)
+		events = append(events, data)
 	}
+
+	return events
 }

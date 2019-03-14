@@ -2,24 +2,20 @@
   type: group
   description: >
     Status fields
-  release: ga
+  release: beta
   fields:
     - name: name
       type: keyword
       description: >
         Kibana instance name.
     - name: uuid
-      type: alias
-      path: service.id
-      migration: true
+      type: keyword
       description: >
         Kibana instance uuid.
     - name: version.number
-      type: alias
+      type: keyword
       description: >
         Kibana version number.
-      path: service.version
-      migration: true
     - name: status.overall.state
       type: keyword
       description: >

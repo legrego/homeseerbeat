@@ -2,16 +2,14 @@
   type: group
   description: >
     Kibana stats and run-time metrics.
-  release: ga
+  release: beta
   fields:
     - name: uuid
-      type: alias
-      path: service.id
-      migration: true
+      type: keyword
       description: >
         Kibana instance UUID
     - name: name
-      type: keyword
+      type: text
       description: >
         Kibana instance name
     - name: index
@@ -23,17 +21,13 @@
       description: >
         Kibana instance hostname
     - name: transport_address
-      type: alias
-      path: service.address
-      migration: true
+      type: keyword
       description: >
         Kibana server's hostname and port
     - name: version
-      type: alias
+      type: keyword
       description: >
         Kibana version
-      path: service.version
-      migration: true
     - name: snapshot
       type: boolean
       description: >

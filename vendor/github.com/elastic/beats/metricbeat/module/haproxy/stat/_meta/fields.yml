@@ -27,9 +27,7 @@
         Component type (0=frontend, 1=backend, 2=server, or 3=socket/listener).
 
     - name: process_id
-      type: alias
-      path: process.pid
-      migration: true
+      type: integer
       description: >
         Process ID (0 for first instance, 1 for second, and so on).
 

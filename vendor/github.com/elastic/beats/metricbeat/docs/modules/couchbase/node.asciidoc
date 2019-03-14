@@ -5,6 +5,8 @@ This file is generated! See scripts/docs_collector.py
 [[metricbeat-metricset-couchbase-node]]
 === Couchbase node metricset
 
+beta[]
+
 include::../../../module/couchbase/node/_meta/docs.asciidoc[]
 
 

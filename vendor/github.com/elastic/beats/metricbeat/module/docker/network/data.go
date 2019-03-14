@@ -29,18 +29,19 @@ func eventsMapping(r mb.ReporterV2, netsStatsList []NetStats) {
 }
 
 func eventMapping(r mb.ReporterV2, stats *NetStats) {
+	// Deprecated fields
 	r.Event(mb.Event{
-		RootFields: stats.Container.ToMapStr(),
+		ModuleFields: common.MapStr{
+			"container": stats.Container.ToMapStr(),
+		},
 		MetricSetFields: common.MapStr{
 			"interface": stats.NameInterface,
-			// Deprecated
 			"in": common.MapStr{
 				"bytes":   stats.RxBytes,
 				"dropped": stats.RxDropped,
 				"errors":  stats.RxErrors,
 				"packets": stats.RxPackets,
 			},
-			// Deprecated
 			"out": common.MapStr{
 				"bytes":   stats.TxBytes,
 				"dropped": stats.TxDropped,

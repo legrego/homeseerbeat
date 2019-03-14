@@ -59,11 +59,10 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 // Fetch methods implements the data gathering and data conversion to the right format
 // It returns the event which is then forward to the output. In case of an error, a
 // descriptive error must be returned.
-func (m *MetricSet) Fetch(r mb.ReporterV2) {
+func (m *MetricSet) Fetch() (common.MapStr, error) {
 	pids, err := process.Pids()
 	if err != nil {
-		r.Error(errors.Wrap(err, "failed to fetch the list of PIDs"))
-		return
+		return nil, errors.Wrap(err, "failed to fetch the list of PIDs")
 	}
 
 	var summary struct {
@@ -115,10 +114,8 @@ func (m *MetricSet) Fetch(r mb.ReporterV2) {
 		"unknown":  summary.unknown,
 		"dead":     summary.dead,
 	}
+	// change the name space to use . instead of _
+	event[mb.NamespaceKey] = "process.summary"
 
-	r.Event(mb.Event{
-		// change the name space to use . instead of _
-		Namespace:       "system.process.summary",
-		MetricSetFields: event,
-	})
+	return event, nil
 }

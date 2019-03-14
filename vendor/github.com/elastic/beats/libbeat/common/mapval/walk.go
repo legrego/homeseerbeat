@@ -24,10 +24,10 @@ import (
 )
 
 type walkObserverInfo struct {
-	key     pathComponent
+	key     PathComponent
 	value   interface{}
 	rootMap common.MapStr
-	path    path
+	path    Path
 }
 
 // walkObserver functions run once per object in the tree.
@@ -35,11 +35,11 @@ type walkObserver func(info walkObserverInfo) error
 
 // walk is a shorthand way to walk a tree.
 func walk(m common.MapStr, expandPaths bool, wo walkObserver) error {
-	return walkFullMap(m, m, path{}, expandPaths, wo)
+	return walkFullMap(m, m, Path{}, expandPaths, wo)
 }
 
-func walkFull(o interface{}, root common.MapStr, path path, expandPaths bool, wo walkObserver) (err error) {
-	lastPathComponent := path.last()
+func walkFull(o interface{}, root common.MapStr, path Path, expandPaths bool, wo walkObserver) (err error) {
+	lastPathComponent := path.Last()
 	if lastPathComponent == nil {
 		panic("Attempted to traverse an empty path in mapval.walkFull, this should never happen.")
 	}
@@ -60,7 +60,7 @@ func walkFull(o interface{}, root common.MapStr, path path, expandPaths bool, wo
 		converted := sliceToSliceOfInterfaces(o)
 
 		for idx, v := range converted {
-			newPath := path.extendSlice(idx)
+			newPath := path.ExtendSlice(idx)
 			err := walkFull(v, root, newPath, expandPaths, wo)
 			if err != nil {
 				return err
@@ -72,17 +72,17 @@ func walkFull(o interface{}, root common.MapStr, path path, expandPaths bool, wo
 }
 
 // walkFullMap walks the given MapStr tree.
-func walkFullMap(m common.MapStr, root common.MapStr, p path, expandPaths bool, wo walkObserver) (err error) {
+func walkFullMap(m common.MapStr, root common.MapStr, path Path, expandPaths bool, wo walkObserver) (err error) {
 	for k, v := range m {
-		var newPath path
+		var newPath Path
 		if !expandPaths {
-			newPath = p.extendMap(k)
+			newPath = path.ExtendMap(k)
 		} else {
-			additionalPath, err := parsePath(k)
+			additionalPath, err := ParsePath(k)
 			if err != nil {
 				return err
 			}
-			newPath = p.concat(additionalPath)
+			newPath = path.Concat(additionalPath)
 		}
 
 		err = walkFull(v, root, newPath, expandPaths, wo)

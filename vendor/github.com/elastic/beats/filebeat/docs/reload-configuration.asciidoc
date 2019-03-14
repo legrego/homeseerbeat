@@ -83,7 +83,7 @@ For example:
 
 [source,yaml]
 ------------------------------------------------------------------------------
-- module: apache
+- module: apache2
   access:
     enabled: true
     var.paths: [/var/log/apache2/access.log*]

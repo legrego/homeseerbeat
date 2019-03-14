@@ -18,8 +18,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"go/format"
 	"io/ioutil"
 	"log"
 	"os"
@@ -78,18 +80,27 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error fetching files for module %v: %v", module, err)
 		}
-		if len(files) == 0 {
-			// This can happen on moved modules
-			log.Printf("No fields files for module %v", module)
-			continue
-		}
 
 		data, err := fields.GenerateFieldsYml(files)
 		if err != nil {
-			log.Fatalf("error fetching files for package %v: %v", module, err)
+			log.Fatalf("Error fetching files for module %v: %v", module, err)
 		}
 
-		bs, err := asset.CreateAsset(license, beatName, module, module, data, "asset.ModuleFieldsPri", dir+"/"+module)
+		encData, err := asset.EncodeData(string(data))
+		if err != nil {
+			log.Fatalf("Error encoding the data: %v", err)
+		}
+
+		var buf bytes.Buffer
+		asset.Template.Execute(&buf, asset.Data{
+			License: license,
+			Beat:    beatName,
+			Name:    module,
+			Data:    encData,
+			Package: module,
+		})
+
+		bs, err := format.Source(buf.Bytes())
 		if err != nil {
 			log.Fatalf("Error creating golang file from template: %v", err)
 		}

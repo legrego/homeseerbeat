@@ -3,21 +3,20 @@
   description: >
     Redis log files
   fields:
+    - name: pid
+      type: long
+      description: >
+        The process ID of the Redis server.
     - name: role
       type: keyword
       description: >
         The role of the Redis instance. Can be one of `master`, `slave`, `child` (for RDF/AOF writing child),
         or `sentinel`.
-
-    - name: pid
-      type: alias
-      path: process.pid
-      migration: true
     - name: level
-      type: alias
-      path: log.level
-      migration: true
+      type: keyword
+      description: >
+        The log level. Can be one of `debug`, `verbose`, `notice`, or `warning`.
     - name: message
-      type: alias
-      path: message
-      migration: true
+      type: text
+      description: >
+        The log message

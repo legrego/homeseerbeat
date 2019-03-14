@@ -34,18 +34,17 @@ type Encoder struct {
 	folder *gotype.Iterator
 
 	version string
-	config  Config
+	config  config
 }
 
-// Config is used to pass encoding parameters to New.
-type Config struct {
+type config struct {
 	Pretty     bool
 	EscapeHTML bool
 }
 
-var defaultConfig = Config{
+var defaultConfig = config{
 	Pretty:     false,
-	EscapeHTML: false,
+	EscapeHTML: true,
 }
 
 func init() {
@@ -57,13 +56,16 @@ func init() {
 			}
 		}
 
-		return New(info.Version, config), nil
+		return New(config.Pretty, config.EscapeHTML, info.Version), nil
 	})
 }
 
 // New creates a new json Encoder.
-func New(version string, config Config) *Encoder {
-	e := &Encoder{version: version, config: config}
+func New(pretty, escapeHTML bool, version string) *Encoder {
+	e := &Encoder{version: version, config: config{
+		Pretty:     pretty,
+		EscapeHTML: escapeHTML,
+	}}
 	e.reset()
 	return e
 }

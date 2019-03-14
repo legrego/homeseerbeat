@@ -20,7 +20,6 @@ package cmd
 import (
 	// register default heartbeat monitors
 	_ "github.com/elastic/beats/heartbeat/monitors/defaults"
-	"github.com/elastic/beats/libbeat/cmd/instance"
 
 	"github.com/elastic/beats/heartbeat/beater"
 	cmd "github.com/elastic/beats/libbeat/cmd"
@@ -30,4 +29,4 @@ import (
 var Name = "heartbeat"
 
 // RootCmd to handle beats cli
-var RootCmd = cmd.GenRootCmdWithSettings(beater.New, instance.Settings{Name: Name})
+var RootCmd = cmd.GenRootCmd(Name, "", beater.New)

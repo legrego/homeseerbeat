@@ -18,21 +18,16 @@
 package processors
 
 import (
+	"fmt"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
 )
 
-const logName = "processors"
-
-// Processors is
 type Processors struct {
 	List []Processor
-	log  *logp.Logger
 }
 
 type Processor interface {
@@ -41,53 +36,35 @@ type Processor interface {
 }
 
 func New(config PluginConfig) (*Processors, error) {
-	procs := &Processors{
-		log: logp.NewLogger(logName),
-	}
+	procs := Processors{}
 
-	for _, procConfig := range config {
-		// Handle if/then/else processor which has multiple top-level keys.
-		if procConfig.HasField("if") {
-			p, err := NewIfElseThenProcessor(procConfig)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to make if/then/else processor")
+	for _, processor := range config {
+
+		if len(processor) != 1 {
+			return nil, fmt.Errorf("each processor needs to have exactly one action, but found %d actions",
+				len(processor))
+		}
+
+		for processorName, cfg := range processor {
+
+			gen, exists := registry.reg[processorName]
+			if !exists {
+				return nil, fmt.Errorf("the processor %s doesn't exist", processorName)
 			}
-			procs.add(p)
-			continue
-		}
 
-		if len(procConfig.GetFields()) != 1 {
-			return nil, errors.Errorf("each processor must have exactly one "+
-				"action, but found %d actions (%v)",
-				len(procConfig.GetFields()),
-				strings.Join(procConfig.GetFields(), ","))
-		}
+			cfg.PrintDebugf("Configure processor '%v' with:", processorName)
+			constructor := gen.Plugin()
+			plugin, err := constructor(cfg)
+			if err != nil {
+				return nil, err
+			}
 
-		actionName := procConfig.GetFields()[0]
-		actionCfg, err := procConfig.Child(actionName, -1)
-		if err != nil {
-			return nil, err
+			procs.add(plugin)
 		}
-
-		gen, exists := registry.reg[actionName]
-		if !exists {
-			return nil, errors.Errorf("the processor action %s does not exist", actionName)
-		}
-
-		actionCfg.PrintDebugf("Configure processor action '%v' with:", actionName)
-		constructor := gen.Plugin()
-		plugin, err := constructor(actionCfg)
-		if err != nil {
-			return nil, err
-		}
-
-		procs.add(plugin)
 	}
 
-	if len(procs.List) > 0 {
-		procs.log.Debugf("Generated new processors: %v", procs)
-	}
-	return procs, nil
+	logp.Debug("processors", "Processors: %v", procs)
+	return &procs, nil
 }
 
 func (procs *Processors) add(p Processor) {
@@ -101,10 +78,7 @@ func (procs *Processors) add(p Processor) {
 // Note: this method will be removed, when the publisher pipeline BC-API is to
 //       be removed.
 func (procs *Processors) RunBC(event common.MapStr) common.MapStr {
-	ret, err := procs.Run(&beat.Event{Fields: event})
-	if err != nil {
-		procs.log.Debugw("Error in processor pipeline", "error", err)
-	}
+	ret := procs.Run(&beat.Event{Fields: event})
 	if ret == nil {
 		return nil
 	}
@@ -123,22 +97,32 @@ func (procs *Processors) All() []beat.Processor {
 	return ret
 }
 
-// Run executes the all processors serially and returns the event and possibly
-// an error. If the event has been dropped (canceled) by a processor in the
-// list then a nil event is returned.
-func (procs *Processors) Run(event *beat.Event) (*beat.Event, error) {
-	var err error
+// Applies a sequence of processing rules and returns the filtered event
+func (procs *Processors) Run(event *beat.Event) *beat.Event {
+	// Check if processors are set, just return event if not
+	if len(procs.List) == 0 {
+		return event
+	}
+
 	for _, p := range procs.List {
+		var err error
 		event, err = p.Run(event)
 		if err != nil {
-			return event, errors.Wrapf(err, "failed applying processor %v", p)
+			// XXX: We don't drop the event, but continue filtering here iff the most
+			//      recent processor did return an event.
+			//      We want processors having this kind of implicit behavior
+			//      on errors?
+
+			logp.Debug("filter", "fail to apply processor %s: %s", p, err)
 		}
+
 		if event == nil {
-			// Drop.
-			return nil, nil
+			// drop event
+			return nil
 		}
 	}
-	return event, nil
+
+	return event
 }
 
 func (procs Processors) String() string {

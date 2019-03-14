@@ -30,6 +30,7 @@ import (
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/cfgfile"
 	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/module"
@@ -92,7 +93,6 @@ func DefaultCreator() beat.Creator {
 	return Creator(
 		WithModuleOptions(
 			module.WithMetricSetInfo(),
-			module.WithServiceName(),
 		),
 	)
 }
@@ -135,6 +135,12 @@ func newMetricbeat(b *beat.Beat, c *common.Config, options ...Option) (*Metricbe
 		}
 
 		failed := false
+
+		err := cfgwarn.CheckRemoved5xSettings(moduleCfg, "filters")
+		if err != nil {
+			errs = append(errs, err)
+			failed = true
+		}
 
 		connector, err := module.NewConnector(b.Publisher, moduleCfg, nil)
 		if err != nil {

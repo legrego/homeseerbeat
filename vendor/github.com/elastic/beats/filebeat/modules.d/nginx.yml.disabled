@@ -1,6 +1,3 @@
-# Module: nginx
-# Docs: https://www.elastic.co/guide/en/beats/filebeat/master/filebeat-module-nginx.html
-
 - module: nginx
   # Access logs
   access:
@@ -10,9 +7,6 @@
     # Filebeat will choose the paths depending on your OS.
     #var.paths:
 
-    # Convert the timestamp to UTC. Requires Elasticsearch >= 6.1.
-    #var.convert_timezone: true
-
   # Error logs
   error:
     enabled: true
@@ -20,6 +14,3 @@
     # Set custom paths for the log files. If left empty,
     # Filebeat will choose the paths depending on your OS.
     #var.paths:
-
-    # Convert the timestamp to UTC. Requires Elasticsearch >= 6.1.
-    #var.convert_timezone: true

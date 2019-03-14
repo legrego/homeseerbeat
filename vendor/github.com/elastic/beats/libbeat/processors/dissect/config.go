@@ -18,7 +18,7 @@
 package dissect
 
 type config struct {
-	Tokenizer    *tokenizer `config:"tokenizer" validate:"required"`
+	Tokenizer    *tokenizer `config:"tokenizer"`
 	Field        string     `config:"field"`
 	TargetPrefix string     `config:"target_prefix"`
 }

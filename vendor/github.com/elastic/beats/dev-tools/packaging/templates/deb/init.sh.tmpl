@@ -21,7 +21,7 @@ DAEMON_ARGS="-c /etc/${NAME}/${NAME}.yml -path.home /usr/share/${NAME} -path.con
 TEST_ARGS="-e test config"
 PIDFILE=/var/run/{{.ServiceName}}.pid
 WRAPPER="/usr/share/${NAME}/bin/${NAME}-god"
-BEAT_USER="{{.BeatUser}}"
+BEAT_USER="root"
 WRAPPER_ARGS="-r / -n -p $PIDFILE"
 SCRIPTNAME=/etc/init.d/{{.ServiceName}}
 

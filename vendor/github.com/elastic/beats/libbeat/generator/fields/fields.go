@@ -52,45 +52,39 @@ func NewYmlFile(path string, indent int) (*YmlFile, error) {
 	}, nil
 }
 
-func makeYml(indent int, paths ...string) ([]*YmlFile, error) {
+func collectCommonFiles(esBeatsPath, beatPath string, fieldFiles []*YmlFile) ([]*YmlFile, error) {
+	commonFields := []string{
+		// Fields for custom beats
+		filepath.Join(beatPath, "_meta/fields.yml"),
+		filepath.Join(beatPath, "_meta/fields.common.yml"),
+	}
+
+	var libbeatFieldFiles []*YmlFile
+	var err error
+	if !isLibbeat(beatPath) {
+		commonFields = append(commonFields,
+			filepath.Join(esBeatsPath, "libbeat/_meta/fields.common.yml"),
+		)
+
+		libbeatModulesPath := filepath.Join(esBeatsPath, "libbeat/processors")
+		libbeatFieldFiles, err = CollectModuleFiles(libbeatModulesPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var files []*YmlFile
-	for _, path := range paths {
-		if ymlFile, err := NewYmlFile(path, indent); err != nil {
+	for _, cf := range commonFields {
+		ymlFile, err := NewYmlFile(cf, 0)
+
+		if err != nil {
 			return nil, err
 		} else if ymlFile != nil {
 			files = append(files, ymlFile)
 		}
 	}
-	return files, nil
-}
 
-func collectCommonFiles(esBeatsPath, beatPath string, fieldFiles []*YmlFile) ([]*YmlFile, error) {
-	var files []*YmlFile
-	var ymls []*YmlFile
-	var err error
-	if ymls, err = makeYml(0, filepath.Join(esBeatsPath, "libbeat/_meta/fields.ecs.yml")); err != nil {
-		return nil, err
-	}
-	files = append(files, ymls...)
-
-	if !isLibbeat(beatPath) {
-		if ymls, err = makeYml(0, filepath.Join(esBeatsPath, "libbeat/_meta/fields.common.yml")); err != nil {
-			return nil, err
-		}
-		files = append(files, ymls...)
-		libbeatModulesPath := filepath.Join(esBeatsPath, "libbeat/processors")
-		libbeatFieldFiles, err := CollectModuleFiles(libbeatModulesPath)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, libbeatFieldFiles...)
-	}
-
-	// Fields for custom beats last, to enable overriding more generically defined fields
-	if ymls, err = makeYml(0, filepath.Join(beatPath, "_meta/fields.common.yml"), filepath.Join(beatPath, "_meta/fields.yml")); err != nil {
-		return nil, err
-	}
-	files = append(files, ymls...)
+	files = append(files, libbeatFieldFiles...)
 
 	return append(files, fieldFiles...), nil
 }
@@ -107,10 +101,7 @@ func writeGeneratedFieldsYml(fieldFiles []*YmlFile, output string) error {
 
 	if output == "-" {
 		fw := bufio.NewWriter(os.Stdout)
-		_, err = fw.Write(data)
-		if err != nil {
-			return err
-		}
+		fw.Write(data)
 		return fw.Flush()
 	}
 
@@ -121,10 +112,7 @@ func writeGeneratedFieldsYml(fieldFiles []*YmlFile, output string) error {
 	defer f.Close()
 
 	fw := bufio.NewWriter(f)
-	_, err = fw.Write(data)
-	if err != nil {
-		return err
-	}
+	fw.Write(data)
 	return fw.Flush()
 }
 

@@ -24,6 +24,8 @@ import (
 )
 
 type Config struct {
+	Name string `config:"name"`
+
 	Hosts []string            `config:"hosts" validate:"required"`
 	Mode  monitors.IPSettings `config:",inline"`
 
@@ -32,6 +34,7 @@ type Config struct {
 }
 
 var DefaultConfig = Config{
+	Name: "icmp",
 	Mode: monitors.DefaultIPSettings,
 
 	Timeout: 16 * time.Second,

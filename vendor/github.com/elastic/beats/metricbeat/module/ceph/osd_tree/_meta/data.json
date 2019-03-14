@@ -1,14 +1,12 @@
 {
     "@timestamp": "2017-10-12T08:05:34.853Z",
-    "agent": {
+    "beat": {
         "hostname": "host.example.com",
         "name": "host.example.com"
     },
     "ceph": {
         "osd_tree": {
-            "children": [
-                "-2"
-            ],
+            "children": "-2",
             "father": "",
             "id": -1,
             "name": "default",
@@ -16,16 +14,10 @@
             "type_id": 10
         }
     },
-    "event": {
-        "dataset": "ceph.osd_tree",
-        "duration": 115000,
-        "module": "ceph"
-    },
     "metricset": {
-        "name": "osd_tree"
-    },
-    "service": {
-        "address": "127.0.0.1:5000",
-        "type": "ceph"
+        "host": "ceph:5000",
+        "module": "ceph",
+        "name": "osd_tree",
+        "rtt": 115
     }
 }

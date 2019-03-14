@@ -18,6 +18,7 @@
 package kibana
 
 import (
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/metricbeat/mb"
 )
@@ -35,6 +36,10 @@ func NewMetricSet(base mb.BaseMetricSet) (*MetricSet, error) {
 	config := DefaultConfig()
 	if err := base.Module().UnpackConfig(&config); err != nil {
 		return nil, err
+	}
+
+	if config.XPackEnabled {
+		cfgwarn.Experimental("The experimental xpack.enabled flag in the " + base.FullyQualifiedName() + " metricset is enabled.")
 	}
 
 	return &MetricSet{

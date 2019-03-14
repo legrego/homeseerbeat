@@ -1,6 +1,7 @@
 import re
 import sys
 import unittest
+import time
 import os
 import shutil
 from metricbeat import BaseTest
@@ -46,7 +47,7 @@ class Test(BaseTest):
             }],
             elasticsearch={"host": self.get_elasticsearch_url()},
         )
-        exit_code = self.run_beat(extra_args=["setup", "--template", "-E", "setup.template.overwrite=true"])
+        exit_code = self.run_beat(extra_args=["setup", "--template"])
 
         assert exit_code == 0
         assert self.log_contains('Loaded index template')

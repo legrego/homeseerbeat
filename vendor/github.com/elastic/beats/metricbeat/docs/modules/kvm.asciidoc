@@ -5,7 +5,7 @@ This file is generated! See scripts/docs_collector.py
 [[metricbeat-module-kvm]]
 == kvm module
 
-beta[]
+experimental[]
 
 This is the kvm module.
 

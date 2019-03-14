@@ -23,21 +23,7 @@ class Test(BaseTest):
         o = objs[0]
 
         assert o["type"] == "cassandra"
-        assert o["event.dataset"] == "cassandra"
-        assert o["event.duration"] == 62453000
-        assert o["event.start"] == o["@timestamp"]
-        assert o["event.end"] == "2016-06-28T09:03:53.502Z"
-        assert o["client.ip"] == "127.0.0.1"
-        assert o["client.port"] == 52749
-        assert o["client.bytes"] == 133
-        assert o["server.ip"] == "127.0.0.1"
-        assert o["server.port"] == 9042
-        assert o["server.bytes"] == 44
-        assert o["network.bytes"] == 133 + 44
-        assert o["network.type"] == "ipv4"
-        assert o["network.transport"] == "tcp"
-        assert o["network.protocol"] == "cassandra"
-        assert o["network.community_id"] == "1:bCORHZnGIk6GWYaE3Kn0DOpQCKE="
+        assert o["port"] == 9042
 
         assert o[
             "cassandra.request.query"] == "CREATE KEYSPACE mykeyspace WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };"
@@ -73,7 +59,7 @@ class Test(BaseTest):
         objs = self.read_output()
         o = objs[0]
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
+        assert o["port"] == 9042
 
         assert o[
             "cassandra.request.query"] == "CREATE TABLE users (\n  user_id int PRIMARY KEY,\n  fname text,\n  lname text\n);"
@@ -107,7 +93,7 @@ class Test(BaseTest):
         o = objs[0]
         print(o)
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
+        assert o["port"] == 9042
 
         assert o[
             "cassandra.request.query"] == "INSERT INTO users (user_id,  fname, lname)\n  VALUES (1745, 'john', 'smith');"
@@ -139,7 +125,7 @@ class Test(BaseTest):
         objs = self.read_output()
         o = objs[0]
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
+        assert o["port"] == 9042
 
         assert o["cassandra.request.query"] == "SELECT * FROM users;"
         assert o["cassandra.request.headers.version"] == "4"
@@ -170,7 +156,7 @@ class Test(BaseTest):
         objs = self.read_output()
         o = objs[0]
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
+        assert o["port"] == 9042
 
         assert o["cassandra.request.query"] == "CREATE INDEX ON users (lname);"
         assert o["cassandra.request.headers.version"] == "4"
@@ -202,10 +188,10 @@ class Test(BaseTest):
         objs = self.read_output()
         o = objs[0]
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
+        assert o["port"] == 9042
 
-        assert o["source.bytes"] == 55
-        assert o["destination.bytes"] == 62
+        assert o["bytes_in"] == 55
+        assert o["bytes_out"] == 62
         assert o["cassandra.request.query"] == "DROP KEYSPACE mykeyspace;"
         print(o)
 
@@ -241,7 +227,7 @@ class Test(BaseTest):
         o = objs[0]
         print(o)
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
+        assert o["port"] == 9042
 
         assert o["cassandra.request.query"] == "SELECT * FROM users WHERE lname = 'smith';"
 
@@ -276,9 +262,9 @@ class Test(BaseTest):
         o = objs[0]
         print(o)
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
-        assert o["source.bytes"] == 9
-        assert o["destination.bytes"] == 61
+        assert o["port"] == 9042
+        assert o["bytes_in"] == 9
+        assert o["bytes_out"] == 61
 
         assert o["cassandra.request.headers.version"] == "4"
         assert o["cassandra.request.headers.op"] == "OPTIONS"
@@ -295,9 +281,9 @@ class Test(BaseTest):
         o = objs[1]
         print(o)
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
-        assert o["source.bytes"] == 31
-        assert o["destination.bytes"] == 9
+        assert o["port"] == 9042
+        assert o["bytes_in"] == 31
+        assert o["bytes_out"] == 9
 
         assert o["cassandra.request.headers.version"] == "4"
         assert o["cassandra.request.headers.op"] == "STARTUP"
@@ -314,9 +300,9 @@ class Test(BaseTest):
         o = objs[2]
         print(o)
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
-        assert o["source.bytes"] == 58
-        assert o["destination.bytes"] == 9
+        assert o["port"] == 9042
+        assert o["bytes_in"] == 58
+        assert o["bytes_out"] == 9
 
         assert o["cassandra.request.headers.version"] == "4"
         assert o["cassandra.request.headers.op"] == "REGISTER"
@@ -348,9 +334,9 @@ class Test(BaseTest):
 
         o = objs[0]
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
-        assert o["source.bytes"] == 31
-        assert o["destination.bytes"] == 9
+        assert o["port"] == 9042
+        assert o["bytes_in"] == 31
+        assert o["bytes_out"] == 9
 
         assert o["cassandra.request.headers.version"] == "4"
         assert o["cassandra.request.headers.op"] == "STARTUP"
@@ -366,9 +352,9 @@ class Test(BaseTest):
 
         o = objs[1]
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
-        assert o["source.bytes"] == 101
-        assert o["destination.bytes"] == 116
+        assert o["port"] == 9042
+        assert o["bytes_in"] == 101
+        assert o["bytes_out"] == 116
 
         assert o["cassandra.request.headers.version"] == "4"
         assert o["cassandra.request.headers.op"] == "QUERY"
@@ -401,9 +387,9 @@ class Test(BaseTest):
         o = objs[0]
         print(o)
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
-        assert o["source.bytes"] == 52
-        assert o["destination.bytes"] == 10
+        assert o["port"] == 9042
+        assert o["bytes_in"] == 52
+        assert o["bytes_out"] == 10
 
         assert o["cassandra.request.headers.version"] == "4"
         assert o["cassandra.request.headers.op"] == "STARTUP"
@@ -420,9 +406,9 @@ class Test(BaseTest):
         o = objs[1]
         print(o)
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
-        assert o["source.bytes"] == 53
-        assert o["destination.bytes"] == 10
+        assert o["port"] == 9042
+        assert o["bytes_in"] == 53
+        assert o["bytes_out"] == 10
 
         assert o["cassandra.request.headers.version"] == "4"
         assert o["cassandra.request.headers.op"] == "REGISTER"
@@ -439,9 +425,9 @@ class Test(BaseTest):
         o = objs[2]
         print(o)
         assert o["type"] == "cassandra"
-        assert o["server.port"] == 9042
-        assert o["source.bytes"] == 62
-        assert o["destination.bytes"] == 165
+        assert o["port"] == 9042
+        assert o["bytes_in"] == 62
+        assert o["bytes_out"] == 165
 
         assert o["cassandra.request.query"] == "SELECT * FROM system.local WHERE key='local'"
 

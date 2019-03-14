@@ -1,5 +1,5 @@
 filebeat:
-  inputs:
+  prospectors:
     -
       paths:
         - /var/log/*.log

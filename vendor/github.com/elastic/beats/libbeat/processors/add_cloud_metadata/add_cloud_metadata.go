@@ -25,7 +25,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -315,55 +314,34 @@ func newCloudMetadata(c *common.Config) (processors.Processor, error) {
 		return nil, err
 	}
 
-	p := &addCloudMetadata{
-		initData: &initData{fetchers, config.Timeout},
+	result := fetchMetadata(fetchers, config.Timeout)
+	if result == nil {
+		logp.Info("add_cloud_metadata: hosting provider type not detected.")
+		return &addCloudMetadata{}, nil
 	}
 
-	go p.initOnce.Do(p.init)
-	return p, nil
-}
+	logp.Info("add_cloud_metadata: hosting provider type detected as %v, metadata=%v",
+		result.provider, result.metadata.String())
 
-type initData struct {
-	fetchers []*metadataFetcher
-	timeout  time.Duration
+	return &addCloudMetadata{metadata: result.metadata}, nil
 }
 
 type addCloudMetadata struct {
-	initOnce sync.Once
-	initData *initData
 	metadata common.MapStr
 }
 
-func (p *addCloudMetadata) init() {
-	result := fetchMetadata(p.initData.fetchers, p.initData.timeout)
-	if result == nil {
-		logp.Info("add_cloud_metadata: hosting provider type not detected.")
-		return
-	}
-	p.metadata = result.metadata
-	p.initData = nil
-	logp.Info("add_cloud_metadata: hosting provider type detected as %v, metadata=%v",
-		result.provider, result.metadata.String())
-}
-
-func (p *addCloudMetadata) getMeta() common.MapStr {
-	p.initOnce.Do(p.init)
-	return p.metadata
-}
-
-func (p *addCloudMetadata) Run(event *beat.Event) (*beat.Event, error) {
-	meta := p.getMeta()
-	if len(meta) == 0 {
+func (p addCloudMetadata) Run(event *beat.Event) (*beat.Event, error) {
+	if len(p.metadata) == 0 {
 		return event, nil
 	}
 
 	// This overwrites the meta.cloud if it exists. But the cloud key should be
 	// reserved for this processor so this should happen.
-	_, err := event.PutValue("cloud", meta)
+	_, err := event.PutValue("meta.cloud", p.metadata)
 
 	return event, err
 }
 
-func (p *addCloudMetadata) String() string {
-	return "add_cloud_metadata=" + p.getMeta().String()
+func (p addCloudMetadata) String() string {
+	return "add_cloud_metadata=" + p.metadata.String()
 }

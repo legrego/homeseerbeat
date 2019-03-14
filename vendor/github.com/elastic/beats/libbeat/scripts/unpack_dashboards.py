@@ -6,9 +6,6 @@ import argparse
 
 def transform_data(data, method):
     for obj in data["objects"]:
-        if "attributes" not in obj:
-            continue
-
         if "uiStateJSON" in obj["attributes"]:
             obj["attributes"]["uiStateJSON"] = method(obj["attributes"]["uiStateJSON"])
 

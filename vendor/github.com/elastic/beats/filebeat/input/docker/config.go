@@ -27,10 +27,9 @@ var defaultConfig = config{
 }
 
 type config struct {
-	// List of containers' log files to tail
 	Containers containers `config:"containers"`
 
-	// Partial configures the input to join partial lines
+	// Partial configures the prospector to join partial lines
 	Partial bool `config:"combine_partials"`
 
 	// Enable CRI flags parsing (to be switched to default in 7.0)
@@ -43,8 +42,6 @@ type config struct {
 type containers struct {
 	IDs  []string `config:"ids"`
 	Path string   `config:"path"`
-
-	Paths []string `config:"paths"`
 
 	// Stream can be all, stdout or stderr
 	Stream string `config:"stream"`

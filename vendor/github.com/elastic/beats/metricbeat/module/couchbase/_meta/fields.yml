@@ -3,7 +3,7 @@
   description: >
     Metrics collected from Couchbase servers.
   short_config: false
-  release: ga
+  release: beta
   settings: ["ssl", "http"]
   fields:
     - name: couchbase

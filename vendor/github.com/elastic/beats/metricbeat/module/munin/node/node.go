@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/munin"
 )
@@ -42,71 +42,53 @@ func init() {
 // interface methods except for Fetch.
 type MetricSet struct {
 	mb.BaseMetricSet
-	serviceType string
-	plugins     []string
-	sanitize    bool
-	timeout     time.Duration
+	namespace string
+	timeout   time.Duration
 }
 
 // New creates a new instance of the MetricSet. New is responsible for unpacking
 // any MetricSet specific configuration options if there are any.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	cfgwarn.Beta("The munin node metricset is beta.")
 
-	config := defaultConfig
+	config := struct {
+		Namespace string `config:"node.namespace" validate:"required"`
+	}{}
 	if err := base.Module().UnpackConfig(&config); err != nil {
 		return nil, err
 	}
 
 	return &MetricSet{
 		BaseMetricSet: base,
-		plugins:       config.Plugins,
-		sanitize:      config.Sanitize,
+		namespace:     config.Namespace,
 		timeout:       base.Module().Config().Timeout,
 	}, nil
 }
 
 // Fetch method implements the data gathering
-func (m *MetricSet) Fetch(r mb.ReporterV2) {
+func (m *MetricSet) Fetch() (common.MapStr, error) {
 	node, err := munin.Connect(m.Host(), m.timeout)
 	if err != nil {
-		r.Error(err)
-		return
+		return nil, err
 	}
 	defer node.Close()
 
-	plugins := m.plugins
-	if len(plugins) == 0 {
-		plugins, err = node.List()
-		if err != nil {
-			r.Error(err)
-			return
-		}
+	items, err := node.List()
+	if err != nil {
+		return nil, err
 	}
 
-	for _, plugin := range plugins {
-		metrics, err := node.Fetch(plugin, m.sanitize)
-		if err != nil {
-			r.Error(err)
-		}
-
-		// Even if there was some error, keep sending succesfully collected metrics if any
-		if len(metrics) == 0 {
-			continue
-		}
-		event := mb.Event{
-			Service: plugin,
-			RootFields: common.MapStr{
-				"munin": common.MapStr{
-					"plugin": common.MapStr{
-						"name": plugin,
-					},
-					"metrics": metrics,
-				},
-			},
-		}
-		if !r.Event(event) {
-			logp.Debug("munin", "Failed to report event, interrupting Fetch")
-			return
-		}
+	event, err := node.Fetch(items...)
+	if err != nil {
+		return nil, err
 	}
+
+	// Set dynamic namespace.
+	_, err = event.Put(mb.NamespaceKey, m.namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return event, nil
+
 }

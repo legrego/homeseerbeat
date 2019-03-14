@@ -1,6 +1,6 @@
 - name: monitor_health
   type: group
-  release: ga
+  release: beta
   description: >
     monitor_health stats data
   fields:

@@ -18,6 +18,7 @@
 package node
 
 import (
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/helper/elastic"
 	"github.com/elastic/beats/metricbeat/mb"
@@ -50,6 +51,8 @@ type MetricSet struct {
 
 // New create a new instance of the MetricSet
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	cfgwarn.Beta("The " + base.FullyQualifiedName() + " metricset is beta")
+
 	ms, err := logstash.NewMetricSet(base)
 	if err != nil {
 		return nil, err

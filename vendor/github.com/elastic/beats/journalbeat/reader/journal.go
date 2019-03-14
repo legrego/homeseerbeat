@@ -25,7 +25,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/coreos/go-systemd/sdjournal"
@@ -154,7 +153,6 @@ func (r *Reader) seek(cursor string) {
 				r.logger.Debug("Seeking method set to cursor, but no state is saved for reader. Starting to read from the beginning")
 			case config.SeekTail:
 				r.journal.SeekTail()
-				r.journal.Next()
 				r.logger.Debug("Seeking method set to cursor, but no state is saved for reader. Starting to read from the end")
 			default:
 				r.logger.Error("Invalid option for cursor_seek_fallback")
@@ -169,7 +167,6 @@ func (r *Reader) seek(cursor string) {
 		r.logger.Debug("Seeked to position defined in cursor")
 	case config.SeekTail:
 		r.journal.SeekTail()
-		r.journal.Next()
 		r.logger.Debug("Tailing the journal file")
 	case config.SeekHead:
 		r.journal.SeekHead()
@@ -187,52 +184,37 @@ func (r *Reader) Next() (*beat.Event, error) {
 		case <-r.done:
 			return nil, nil
 		default:
-		}
-
-		c, err := r.journal.Next()
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
-
-		// error while reading next entry
-		if c < 0 {
-			return nil, fmt.Errorf("error while reading next entry %+v", syscall.Errno(-c))
-		}
-
-		// no new entry, so wait
-		if c == 0 {
-			hasNewEntry, err := r.checkForNewEvents()
+			event, err := r.readEvent()
 			if err != nil {
 				return nil, err
 			}
-			if !hasNewEntry {
+
+			if event == nil {
+				r.backoff.Wait()
 				continue
 			}
-		}
 
+			r.backoff.Reset()
+			return event, nil
+		}
+	}
+}
+
+func (r *Reader) readEvent() (*beat.Event, error) {
+	n, err := r.journal.Next()
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	for n == 1 {
 		entry, err := r.journal.GetEntry()
 		if err != nil {
 			return nil, err
 		}
 		event := r.toEvent(entry)
-
 		return event, nil
 	}
-}
-
-func (r *Reader) checkForNewEvents() (bool, error) {
-	c := r.journal.Wait(100 * time.Millisecond)
-	switch c {
-	case sdjournal.SD_JOURNAL_NOP:
-		return false, nil
-	// new entries are added or the journal has changed (e.g. vacuum, rotate)
-	case sdjournal.SD_JOURNAL_APPEND, sdjournal.SD_JOURNAL_INVALIDATE:
-		return true, nil
-	default:
-	}
-
-	r.logger.Errorf("Unknown return code from Wait: %d\n", c)
-	return false, nil
+	return nil, nil
 }
 
 // toEvent creates a beat.Event from journal entries.
@@ -251,7 +233,7 @@ func (r *Reader) toEvent(entry *sdjournal.JournalEntry) *beat.Event {
 	}
 
 	if len(custom) != 0 {
-		fields.Put("journald.custom", custom)
+		fields["custom"] = custom
 	}
 
 	state := checkpoint.JournalState{
@@ -261,7 +243,7 @@ func (r *Reader) toEvent(entry *sdjournal.JournalEntry) *beat.Event {
 		MonotonicTimestamp: entry.MonotonicTimestamp,
 	}
 
-	fields.Put("event.created", time.Now())
+	fields["read_timestamp"] = time.Now()
 	receivedByJournal := time.Unix(0, int64(entry.RealtimeTimestamp)*1000)
 
 	event := beat.Event{

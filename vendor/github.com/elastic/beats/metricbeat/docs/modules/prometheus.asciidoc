@@ -5,8 +5,10 @@ This file is generated! See scripts/docs_collector.py
 [[metricbeat-module-prometheus]]
 == Prometheus module
 
-This module periodically scrapes metrics from
-https://prometheus.io/docs/instrumenting/exporters/[Prometheus exporters].
+This module periodically fetches metrics from
+https://prometheus.io/docs/[Prometheus].
+
+The default metricset is `collector`.
 
 
 [float]
@@ -19,11 +21,20 @@ in <<configuration-metricbeat>>. Here is an example configuration:
 ----
 metricbeat.modules:
 - module: prometheus
+  metricsets: ["stats"]
+  enabled: true
   period: 10s
   hosts: ["localhost:9090"]
-  metrics_path: /metrics
-  #username: "user"
-  #password: "secret"
+  #metrics_path: /metrics
+  #namespace: example
+
+- module: prometheus
+  metricsets: ["collector"]
+  enabled: true
+  period: 10s
+  hosts: ["localhost:9090"]
+  #metrics_path: /metrics
+  #namespace: example
 
   # This can be used for service account based authorization:
   #  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -41,5 +52,9 @@ The following metricsets are available:
 
 * <<metricbeat-metricset-prometheus-collector,collector>>
 
+* <<metricbeat-metricset-prometheus-stats,stats>>
+
 include::prometheus/collector.asciidoc[]
+
+include::prometheus/stats.asciidoc[]
 

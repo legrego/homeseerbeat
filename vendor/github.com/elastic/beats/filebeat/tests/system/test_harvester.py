@@ -7,8 +7,6 @@ import time
 import base64
 import io
 import re
-import unittest
-from parameterized import parameterized
 
 """
 Test Harvesters
@@ -78,7 +76,6 @@ class Test(BaseTest):
         data = self.get_registry()
         assert len(data) == 2
 
-    @unittest.skipIf(os.name == 'nt', 'flaky test https://github.com/elastic/beats/issues/9214')
     def test_close_removed(self):
         """
         Checks that a file is closed if removed
@@ -457,12 +454,7 @@ class Test(BaseTest):
 
         filebeat.check_kill_and_wait()
 
-    @parameterized.expand([
-        ("utf-8", "utf-8", codecs.BOM_UTF8),
-        ("utf-16be-bom", "utf-16-be", codecs.BOM_UTF16_BE),
-        ("utf-16le-bom", "utf-16-le", codecs.BOM_UTF16_LE),
-    ])
-    def test_boms(self, fb_encoding, py_encoding, bom):
+    def test_boms(self):
         """
         Test bom log files if bom is removed properly
         """
@@ -472,35 +464,45 @@ class Test(BaseTest):
 
         message = "Hello World"
 
-        # Render config with specific encoding
-        self.render_config_template(
-            path=os.path.abspath(self.working_dir) + "/log/" + fb_encoding + "*",
-            encoding=fb_encoding,
-            output_file_filename=fb_encoding,
-        )
+        # Config array contains:
+        # filebeat encoding, python encoding name, bom
+        configs = [
+            ("utf-8", "utf-8", codecs.BOM_UTF8),
+            ("utf-16be-bom", "utf-16-be", codecs.BOM_UTF16_BE),
+            ("utf-16le-bom", "utf-16-le", codecs.BOM_UTF16_LE),
+        ]
 
-        logfile = self.working_dir + "/log/" + fb_encoding + "test.log"
+        for config in configs:
 
-        # Write bom to file
-        with codecs.open(logfile, 'wb') as file:
-            file.write(bom)
+            # Render config with specific encoding
+            self.render_config_template(
+                path=os.path.abspath(self.working_dir) + "/log/*",
+                encoding=config[0],
+                output_file_filename=config[0],
+            )
 
-        # Write hello world to file
-        with codecs.open(logfile, 'a', py_encoding) as file:
-            content = message + '\n'
-            file.write(content)
+            logfile = self.working_dir + "/log/" + config[0] + "test.log"
 
-        filebeat = self.start_beat(output=fb_encoding + ".log")
+            # Write bom to file
+            with codecs.open(logfile, 'wb') as file:
+                file.write(config[2])
 
-        self.wait_until(
-            lambda: self.output_has(lines=1, output_file="output/" + fb_encoding),
-            max_timeout=10)
+            # Write hello world to file
+            with codecs.open(logfile, 'a', config[1]) as file:
+                content = message + '\n'
+                file.write(content)
 
-        # Verify that output does not contain bom
-        output = self.read_output_json(output_file="output/" + fb_encoding)
-        assert output[0]["message"] == message
+            filebeat = self.start_beat(output=config[0] + ".log")
 
-        filebeat.kill_and_wait()
+            self.wait_until(
+                lambda: self.output_has(lines=1, output_file="output/" + config[0]),
+                max_timeout=10)
+
+            # Verify that output does not contain bom
+            output = self.read_output_json(output_file="output/" + config[0])
+            assert output[0]["message"] == message
+
+            filebeat.kill_and_wait()
 
     def test_ignore_symlink(self):
         """

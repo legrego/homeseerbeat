@@ -89,7 +89,6 @@ type (
 		data    txAllocArea
 		meta    txAllocArea
 		options txAllocOptions // per transaction allocation options
-		stats   txAllocStats
 	}
 
 	txAllocArea struct {
@@ -107,17 +106,6 @@ type (
 	txAllocOptions struct {
 		overflowAreaEnabled bool // enable allocating pages with ID > maxPages for metadata
 		metaGrowPercentage  int  // limit of meta area in use, so to allocate new pages into the meta area
-	}
-
-	txAllocStats struct {
-		data     txAllocAreaStats
-		meta     txAllocAreaStats
-		overflow txAllocAreaStats // overflow region allocations/frees
-		toMeta   uint             // number of pages moved from data area to meta area
-	}
-
-	txAllocAreaStats struct {
-		alloc, freed uint
 	}
 )
 
@@ -176,6 +164,9 @@ func (a *allocator) fileCommitPrepare(
 ) {
 	st.tx = tx
 	st.updated = forceUpdate || tx.Updated()
+	if st.updated {
+		a.MetaAllocator().FreeRegions(tx, a.freelistPages)
+	}
 }
 
 func (a *allocator) fileCommitAlloc(st *allocCommitState) reason {
@@ -231,8 +222,6 @@ func (a *allocator) fileCommitAlloc(st *allocCommitState) reason {
 	// Remove pages from end of overflow area from meta freelist + adjust end marker
 	st.metaList, st.overflowFreed = releaseOverflowPages(newMetaList, a.maxPages, metaEndMarker)
 	if st.overflowFreed > 0 {
-		st.tx.stats.overflow.freed += st.overflowFreed
-
 		newEnd := metaEndMarker - PageID(st.overflowFreed)
 		if metaEndMarker > dataEndMarker { // shrink overflow area, which was allocated from data area
 			dataEndMarker = newEnd
@@ -384,21 +373,6 @@ func (a *allocArea) rollback(st *txAllocArea) {
 // metaManager
 // -----------
 
-func (mm *metaManager) onGrow(st *txAllocState, n uint, overflow bool) {
-	if overflow {
-		st.stats.overflow.alloc += n
-	}
-	st.stats.toMeta += n
-}
-
-func (mm *metaManager) onAlloc(st *txAllocState, n uint) {
-	st.stats.meta.alloc++
-}
-
-func (mm *metaManager) onFree(st *txAllocState, n uint) {
-	st.stats.meta.freed++
-}
-
 func (mm *metaManager) DataAllocator() *dataAllocator {
 	return (*dataAllocator)(mm)
 }
@@ -475,7 +449,9 @@ func (mm *metaManager) tryGrow(
 		}
 
 		da.AllocRegionsWith(st, avail, func(reg region) {
-			mm.transferToMeta(st, reg)
+			st.manager.moveToMeta.Add(reg)
+			mm.metaTotal += uint(reg.count)
+			mm.meta.freelist.AddRegion(reg)
 		})
 
 		// allocate from overflow area
@@ -485,9 +461,7 @@ func (mm *metaManager) tryGrow(
 		}
 		allocFromArea(&st.meta, &mm.meta.endMarker, required, func(reg region) {
 			// st.manager.fromOverflow.Add(reg)
-			n := uint(reg.count)
-			mm.onGrow(st, n, true)
-			mm.metaTotal += n
+			mm.metaTotal += uint(reg.count)
 			mm.meta.freelist.AddRegion(reg)
 		})
 		if mm.maxPages == 0 && mm.data.endMarker < mm.meta.endMarker {
@@ -500,28 +474,23 @@ func (mm *metaManager) tryGrow(
 	// Enough memory available in data area. Try to allocate continuous region first
 	reg := da.AllocContinuousRegion(st, count)
 	if reg.id != 0 {
-		mm.transferToMeta(st, reg)
+		st.manager.moveToMeta.Add(reg)
+		mm.metaTotal += uint(reg.count)
+		mm.meta.freelist.AddRegion(reg)
 		return true
 	}
 
 	// no continuous memory block -> allocate single regions
 	n := da.AllocRegionsWith(st, count, func(reg region) {
-		mm.transferToMeta(st, reg)
+		st.manager.moveToMeta.Add(reg)
+		mm.metaTotal += uint(reg.count)
+		mm.meta.freelist.AddRegion(reg)
 	})
 	return n == count
 }
 
-func (mm *metaManager) transferToMeta(st *txAllocState, reg region) {
-	n := uint(reg.count)
-	st.manager.moveToMeta.Add(reg)
-	mm.onGrow(st, n, false)
-	mm.metaTotal += uint(reg.count)
-	mm.meta.freelist.AddRegion(reg)
-}
-
 func (mm *metaManager) Free(st *txAllocState, id PageID) {
 	// mark page as freed for now
-	mm.onFree(st, 1)
 	st.meta.freed.Add(id)
 }
 
@@ -571,14 +540,6 @@ func (a *dataAllocator) Avail(_ *txAllocState) uint {
 	return avail
 }
 
-func (a *dataAllocator) onAlloc(st *txAllocState, n uint) {
-	st.stats.data.alloc += n
-}
-
-func (a *dataAllocator) onFree(st *txAllocState, n uint) {
-	st.stats.data.freed += n
-}
-
 func (a *dataAllocator) AllocContinuousRegion(
 	st *txAllocState,
 	n uint,
@@ -590,7 +551,6 @@ func (a *dataAllocator) AllocContinuousRegion(
 
 	reg := allocContFromFreelist(&a.data.freelist, &st.data, allocFromBeginning, n)
 	if reg.id != 0 {
-		a.onAlloc(st, n)
 		return reg
 	}
 
@@ -604,8 +564,6 @@ func (a *dataAllocator) AllocContinuousRegion(
 	if a.meta.endMarker < a.data.endMarker {
 		a.meta.endMarker = a.data.endMarker
 	}
-
-	a.onAlloc(st, n)
 	return reg
 }
 
@@ -631,8 +589,6 @@ func (a *dataAllocator) AllocRegionsWith(
 			a.meta.endMarker = a.data.endMarker
 		}
 	}
-
-	a.onAlloc(st, count)
 	return count
 }
 
@@ -642,8 +598,6 @@ func (a *dataAllocator) Free(st *txAllocState, id PageID) {
 	if id < 2 || id >= a.data.endMarker {
 		panic(fmt.Sprintf("freed page ID %v out of bounds", id))
 	}
-
-	a.onFree(st, 1)
 
 	if !st.data.new.Has(id) {
 		// fast-path, page has not been allocated in current transaction
@@ -702,8 +656,6 @@ func (a *walAllocator) Alloc(st *txAllocState) PageID {
 	if reg.id == 0 {
 		return 0
 	}
-
-	mm.onAlloc(st, 1)
 	st.meta.allocated.Add(reg.id)
 	return reg.id
 }
@@ -714,9 +666,7 @@ func (a *walAllocator) AllocRegionsWith(st *txAllocState, n uint, fn func(region
 		return 0
 	}
 
-	count := allocFromFreelist(&a.meta.freelist, &st.meta, allocFromBeginning, n, fn)
-	mm.onAlloc(st, count)
-	return count
+	return allocFromFreelist(&a.meta.freelist, &st.meta, allocFromBeginning, n, fn)
 }
 
 func (a *walAllocator) Free(st *txAllocState, id PageID) {
@@ -742,9 +692,7 @@ func (a *metaAllocator) AllocRegionsWith(
 		return 0
 	}
 
-	count := allocFromFreelist(&a.meta.freelist, &st.meta, allocFromEnd, n, fn)
-	mm.onAlloc(st, count)
-	return count
+	return allocFromFreelist(&a.meta.freelist, &st.meta, allocFromEnd, n, fn)
 }
 
 func (a *metaAllocator) AllocRegions(st *txAllocState, n uint) regionList {

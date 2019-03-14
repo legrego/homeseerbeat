@@ -15,9 +15,7 @@
         Process number.
 
     - name: pid
-      type: alias
-      path: process.pid
-      migration: true
+      type: long
       description: >
         Process ID.
 

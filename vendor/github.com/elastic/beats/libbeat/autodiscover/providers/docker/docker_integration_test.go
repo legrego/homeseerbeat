@@ -43,9 +43,8 @@ func TestDockerStart(t *testing.T) {
 		t.Fatal(err)
 	}
 	bus := bus.New("test")
-	config := defaultConfig()
-	config.CleanupTimeout = 0
-	provider, err := AutodiscoverBuilder(bus, UUID, common.MustNewConfigFrom(config))
+	config := common.NewConfig()
+	provider, err := AutodiscoverBuilder(bus, UUID, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,23 +92,17 @@ func checkEvent(t *testing.T, listener bus.Listener, start bool) {
 				assert.Equal(t, getValue(e, "stop"), true)
 				assert.Nil(t, getValue(e, "start"))
 			}
-			assert.Equal(t, getValue(e, "container.image.name"), "busybox")
-			// labels.dedot=true by default
-			assert.Equal(t,
-				common.MapStr{
-					"label": common.MapStr{
-						"value": "foo",
-						"child": "bar",
-					},
+			assert.Equal(t, getValue(e, "docker.container.image"), "busybox")
+			assert.Equal(t, getValue(e, "docker.container.labels"), common.MapStr{
+				"label": common.MapStr{
+					"value": "foo",
+					"child": "bar",
 				},
-				getValue(e, "container.labels"),
-			)
-			assert.NotNil(t, getValue(e, "container.id"))
-			assert.NotNil(t, getValue(e, "container.name"))
+			})
+			assert.NotNil(t, getValue(e, "docker.container.id"))
+			assert.NotNil(t, getValue(e, "docker.container.name"))
 			assert.NotNil(t, getValue(e, "host"))
-			assert.Equal(t, getValue(e, "docker.container.id"), getValue(e, "meta.container.id"))
-			assert.Equal(t, getValue(e, "docker.container.name"), getValue(e, "meta.container.name"))
-			assert.Equal(t, getValue(e, "docker.container.image"), getValue(e, "meta.container.image.name"))
+			assert.Equal(t, getValue(e, "docker"), getValue(e, "meta.docker"))
 			return
 
 		case <-time.After(10 * time.Second):

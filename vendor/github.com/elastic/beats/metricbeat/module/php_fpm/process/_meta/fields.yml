@@ -2,12 +2,10 @@
   type: group
   description: >
     process contains the metrics that were obtained from the PHP-FPM process.
-  release: ga
+  release: beta
   fields:
   - name: pid
-    type: alias
-    path: process.pid
-    migration: true
+    type: integer
     description: >
       The PID of the process
   - name: state
@@ -32,31 +30,23 @@
     description: >
       The duration in microseconds (1 million in a second) of the current request (my own definition)
   - name: request_method
-    type: alias
-    path: http.request.method
-    migration: true
+    type: keyword
     description: >
       The request method (GET, POST, etc) (of the current request)
   - name: request_uri
-    type: alias
-    path: url.original
-    migration: true
+    type: text
     description: >
       The request URI with the query string (of the current request)
   - name: content_length
-    type: alias
-    path: http.response.body.bytes
-    migration: true
+    type: integer
     description: >
       The content length of the request (only with POST) (of the current request)
   - name: user
-    type: alias
-    path: user.name
-    migration: true
+    type: keyword
     description: >
       The user (PHP_AUTH_USER) (or - if not set) (for the current request)
   - name: script
-    type: keyword
+    type: text
     description: >
       The main script called (or - if not set) (for the current request)
   - name: last_request_cpu

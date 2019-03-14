@@ -55,26 +55,6 @@ func getMockedConns() []net.ConnectionStat {
 		net.ConnectionStat{
 			Family: syscall.AF_INET,
 			Type:   syscall.SOCK_STREAM,
-			Status: "CLOSE_WAIT",
-		},
-		net.ConnectionStat{
-			Family: syscall.AF_INET,
-			Type:   syscall.SOCK_STREAM,
-			Status: "TIME_WAIT",
-		},
-		net.ConnectionStat{
-			Family: syscall.AF_INET,
-			Type:   syscall.SOCK_STREAM,
-			Status: "CLOSE_WAIT",
-		},
-		net.ConnectionStat{
-			Family: syscall.AF_INET,
-			Type:   syscall.SOCK_STREAM,
-			Status: "CLOSE_WAIT",
-		},
-		net.ConnectionStat{
-			Family: syscall.AF_INET,
-			Type:   syscall.SOCK_STREAM,
 			Status: "CLOSE",
 		},
 		net.ConnectionStat{
@@ -119,30 +99,9 @@ func TestCalculateConnStats(t *testing.T) {
 		t.Fail()
 	}
 
-	tcpEstablisheds, err := metrics.GetValue("tcp.all.established")
-
-	if err != nil {
-		t.Fail()
-	}
-
-	tcpClosewaits, err := metrics.GetValue("tcp.all.close_wait")
-
-	if err != nil {
-		t.Fail()
-	}
-
-	tcpTimewaits, err := metrics.GetValue("tcp.all.time_wait")
-
-	if err != nil {
-		t.Fail()
-	}
-
-	assert.Equal(t, allConns, 11)
+	assert.Equal(t, allConns, 7)
 	assert.Equal(t, allListens, 2)
 	assert.Equal(t, udpConns, 2)
-	assert.Equal(t, tcpConns, 9)
+	assert.Equal(t, tcpConns, 5)
 	assert.Equal(t, tcpListens, 2)
-	assert.Equal(t, tcpEstablisheds, 2)
-	assert.Equal(t, tcpClosewaits, 3)
-	assert.Equal(t, tcpTimewaits, 1)
 }

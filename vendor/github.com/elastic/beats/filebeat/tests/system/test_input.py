@@ -563,7 +563,7 @@ class Test(BaseTest):
             path=os.path.abspath(self.working_dir) + "/test.log",
             input_processors=[{
                 "drop_fields": {
-                    "fields": ["log.offset"],
+                    "fields": ["offset"],
                 },
             }]
         )
@@ -588,7 +588,7 @@ class Test(BaseTest):
             path=os.path.abspath(self.working_dir) + "/test.log",
             input_processors=[{
                 "include_fields": {
-                    "fields": ["log.offset"],
+                    "fields": ["offset"],
                 },
             }]
         )
@@ -603,7 +603,7 @@ class Test(BaseTest):
             required_fields=["@timestamp"],
         )[0]
         assert "message" not in output
-        assert "log.offset" in output
+        assert "offset" in output
 
     def test_restart_recursive_glob(self):
         """

@@ -2,7 +2,7 @@
   type: group
   description: >
     Contains etcd self statistics.
-  release: ga
+  release: beta
   fields:
     - name: id
       type: keyword
@@ -15,12 +15,10 @@
         id of the current leader member
     - name: leaderinfo.starttime
       type: keyword
-      description: >
-        the time when this node was started
     - name: leaderinfo.uptime
       type: keyword
       description: >
-        amount of time the leader has been leader
+        id of the current leader member
 
     - name: name
       type: keyword

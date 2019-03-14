@@ -27,20 +27,20 @@ import (
 	"github.com/elastic/beats/libbeat/common"
 )
 
-// pathComponentType indicates the type of pathComponent.
-type pathComponentType int
+// PathComponentType indicates the type of PathComponent.
+type PathComponentType int
 
 const (
-	// pcMapKey is the Type for map keys.
-	pcMapKey pathComponentType = 1 + iota
-	// pcSliceIdx is the Type for slice indices.
-	pcSliceIdx
+	// PCMapKey is the Type for map keys.
+	PCMapKey PathComponentType = 1 + iota
+	// PCSliceIdx is the Type for slice indices.
+	PCSliceIdx
 )
 
-func (pct pathComponentType) String() string {
-	if pct == pcMapKey {
+func (pct PathComponentType) String() string {
+	if pct == PCMapKey {
 		return "map"
-	} else if pct == pcSliceIdx {
+	} else if pct == PCSliceIdx {
 		return "slice"
 	} else {
 		// This should never happen, but we don't want to return an
@@ -49,52 +49,52 @@ func (pct pathComponentType) String() string {
 	}
 }
 
-// pathComponent structs represent one breadcrumb in a path.
-type pathComponent struct {
-	Type  pathComponentType // One of pcMapKey or pcSliceIdx
+// PathComponent structs represent one breadcrumb in a Path.
+type PathComponent struct {
+	Type  PathComponentType // One of PCMapKey or PCSliceIdx
 	Key   string            // Populated for maps
 	Index int               // Populated for slices
 }
 
-func (pc pathComponent) String() string {
-	if pc.Type == pcSliceIdx {
+func (pc PathComponent) String() string {
+	if pc.Type == PCSliceIdx {
 		return fmt.Sprintf("[%d]", pc.Index)
 	}
 	return pc.Key
 }
 
-// path represents the path within a nested set of maps.
-type path []pathComponent
+// Path represents the path within a nested set of maps.
+type Path []PathComponent
 
-// extendSlice is used to add a new pathComponent of the pcSliceIdx type.
-func (p path) extendSlice(index int) path {
+// ExtendSlice is used to add a new PathComponent of the PCSliceIdx type.
+func (p Path) ExtendSlice(index int) Path {
 	return p.extend(
-		pathComponent{pcSliceIdx, "", index},
+		PathComponent{PCSliceIdx, "", index},
 	)
 }
 
-// extendMap adds a new pathComponent of the pcMapKey type.
-func (p path) extendMap(key string) path {
+// ExtendMap adds a new PathComponent of the PCMapKey type.
+func (p Path) ExtendMap(key string) Path {
 	return p.extend(
-		pathComponent{pcMapKey, key, -1},
+		PathComponent{PCMapKey, key, -1},
 	)
 }
 
-func (p path) extend(pc pathComponent) path {
-	out := make(path, len(p)+1)
+func (p Path) extend(pc PathComponent) Path {
+	out := make(Path, len(p)+1)
 	copy(out, p)
 	out[len(p)] = pc
 	return out
 }
 
-// concat combines two paths into a new path without modifying any existing paths.
-func (p path) concat(other path) path {
-	out := make(path, 0, len(p)+len(other))
+// Concat combines two paths into a new path without modifying any existing paths.
+func (p Path) Concat(other Path) Path {
+	out := make(Path, 0, len(p)+len(other))
 	out = append(out, p...)
 	return append(out, other...)
 }
 
-func (p path) String() string {
+func (p Path) String() string {
 	out := make([]string, len(p))
 	for idx, pc := range p {
 		out[idx] = pc.String()
@@ -102,9 +102,9 @@ func (p path) String() string {
 	return strings.Join(out, ".")
 }
 
-// last returns a pointer to the last pathComponent in this path. If the path empty,
+// Last returns a pointer to the last PathComponent in this path. If the path empty,
 // a nil pointer is returned.
-func (p path) last() *pathComponent {
+func (p Path) Last() *PathComponent {
 	idx := len(p) - 1
 	if idx < 0 {
 		return nil
@@ -112,8 +112,8 @@ func (p path) last() *pathComponent {
 	return &p[len(p)-1]
 }
 
-// getFrom takes a map and fetches the given path from it.
-func (p path) getFrom(m common.MapStr) (value interface{}, exists bool) {
+// GetFrom takes a map and fetches the given path from it.
+func (p Path) GetFrom(m common.MapStr) (value interface{}, exists bool) {
 	value = m
 	exists = true
 	for _, pc := range p {
@@ -153,26 +153,26 @@ var arrMatcher = regexp.MustCompile("\\[(\\d+)\\]")
 type InvalidPathString string
 
 func (ps InvalidPathString) Error() string {
-	return fmt.Sprintf("Invalid path path: %#v", ps)
+	return fmt.Sprintf("Invalid path Path: %#v", ps)
 }
 
-// parsePath parses a path of form key.[0].otherKey.[1] into a path object.
-func parsePath(in string) (p path, err error) {
+// ParsePath parses a path of form key.[0].otherKey.[1] into a Path object.
+func ParsePath(in string) (p Path, err error) {
 	keyParts := strings.Split(in, ".")
 
-	p = make(path, len(keyParts))
+	p = make(Path, len(keyParts))
 	for idx, part := range keyParts {
 		r := arrMatcher.FindStringSubmatch(part)
-		pc := pathComponent{Index: -1}
+		pc := PathComponent{Index: -1}
 		if len(r) > 0 {
-			pc.Type = pcSliceIdx
+			pc.Type = PCSliceIdx
 			// Cannot fail, validated by regexp already
 			pc.Index, err = strconv.Atoi(r[1])
 			if err != nil {
 				return p, err
 			}
 		} else if len(part) > 0 {
-			pc.Type = pcMapKey
+			pc.Type = PCMapKey
 			pc.Key = part
 		} else {
 			return p, InvalidPathString(in)
@@ -184,9 +184,9 @@ func parsePath(in string) (p path, err error) {
 	return p, nil
 }
 
-// mustParsePath is a convenience method for parsing paths that have been previously validated
-func mustParsePath(in string) path {
-	out, err := parsePath(in)
+// MustParsePath is a convenience method for parsing paths that have been previously validated
+func MustParsePath(in string) Path {
+	out, err := ParsePath(in)
 	if err != nil {
 		panic(err)
 	}

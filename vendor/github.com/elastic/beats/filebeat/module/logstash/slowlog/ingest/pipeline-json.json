@@ -1,5 +1,5 @@
 {
-    "description": "Pipeline for parsing logstash slowlogs",
+    "description": "Pipeline for parsing logstash log logs",
     "on_failure": [
         {
             "set": {
@@ -18,7 +18,7 @@
         {
             "rename": {
                 "field": "@timestamp",
-                "target_field": "event.created"
+                "target_field": "read_timestamp"
             }
         },
         {
@@ -51,7 +51,7 @@
         {
             "rename": {
                 "field": "logstash.slowlog.logEvent.took_in_nanos",
-                "target_field": "event.duration"
+                "target_field": "logstash.slowlog.took_in_nanos"
             }
         },
         {
@@ -81,12 +81,6 @@
                     "logstash.slowlog.timeMillis",
                     "logstash.slowlog.logEvent"
                 ]
-            }
-        },
-        {
-            "rename": {
-                "field": "logstash.slowlog.level",
-                "target_field": "log.level"
             }
         }
     ]

@@ -7,7 +7,6 @@ import subprocess
 from elasticsearch import Elasticsearch
 import logging
 from parameterized import parameterized
-import semver
 
 
 class Test(BaseTest):
@@ -24,7 +23,7 @@ class Test(BaseTest):
                                             "/../../../../module")
 
         self.kibana_path = os.path.abspath(self.working_dir +
-                                           "/../../../../build/kibana")
+                                           "/../../../../_meta/kibana.generated")
 
         self.filebeat = os.path.abspath(self.working_dir +
                                         "/../../../../filebeat.test")
@@ -32,51 +31,42 @@ class Test(BaseTest):
         self.index_name = "test-filebeat-ml"
 
     @parameterized.expand([
-        (False,),
-        (True,),
+        (True, False),
+        (True, True),
+        (False, False),
+        (False, True),
     ])
     @unittest.skipIf(not INTEGRATION_TESTS,
                      "integration tests are disabled, run with INTEGRATION_TESTS=1 to enable them.")
     @unittest.skipIf(os.getenv("TESTING_ENVIRONMENT") == "2x",
                      "integration test not available on 2.x")
     @unittest.skipIf(os.name == "nt", "skipped on Windows")
-    def test_ml_setup(self, modules_flag):
+    def test_ml_setup(self, setup_flag, modules_flag):
         """ Test ML are installed in all possible ways """
-        self._run_ml_test(modules_flag)
+        self._run_ml_test(setup_flag, modules_flag)
 
-    def _run_ml_test(self, modules_flag):
+    def _run_ml_test(self, setup_flag, modules_flag):
         self.init()
 
         from elasticsearch import AuthorizationException
 
-        es_info = self.es.info()
-        version = semver.parse(es_info["version"]["number"])
-        if version["major"] < 7:
-            start_trial_api_url = "/_xpack/license/start_trial?acknowledge=true"
-            ml_datafeeds_url = "/_xpack/ml/datafeeds/"
-            ml_anomaly_detectors_url = "/_xpack/ml/anomaly_detectors/"
-        else:
-            start_trial_api_url = "/_license/start_trial?acknowledge=true"
-            ml_datafeeds_url = "/_ml/datafeeds/"
-            ml_anomaly_detectors_url = "/_ml/anomaly_detectors/"
-
         try:
-            output = self.es.transport.perform_request("POST", start_trial_api_url)
+            output = self.es.transport.perform_request("POST", "/_xpack/license/start_trial?acknowledge=true")
         except AuthorizationException:
             print("License already enabled")
 
-        print("Test modules_flag: {}".format(modules_flag))
+        print("Test setup_flag: {}, modules_flag: {}".format(setup_flag, modules_flag))
 
         # Clean any previous state
-        for df in self.es.transport.perform_request("GET", ml_datafeeds_url)["datafeeds"]:
+        for df in self.es.transport.perform_request("GET", "/_xpack/ml/datafeeds/")["datafeeds"]:
             if df["datafeed_id"] == 'filebeat-nginx-access-response_code':
                 self.es.transport.perform_request(
-                    "DELETE", "/_ml/datafeeds/" + df["datafeed_id"])
+                    "DELETE", "/_xpack/ml/datafeeds/" + df["datafeed_id"])
 
-        for df in self.es.transport.perform_request("GET", ml_anomaly_detectors_url)["jobs"]:
+        for df in self.es.transport.perform_request("GET", "/_xpack/ml/anomaly_detectors/")["jobs"]:
             if df["job_id"] == 'datafeed-filebeat-nginx-access-response_code':
                 self.es.transport.perform_request(
-                    "DELETE", ml_anomaly_detectors_url + df["job_id"])
+                    "DELETE", "/_xpack/ml/anomaly_detectors/" + df["job_id"])
 
         shutil.rmtree(os.path.join(self.working_dir,
                                    "modules.d"), ignore_errors=True)
@@ -103,9 +93,14 @@ class Test(BaseTest):
             "-c", cfgfile
         ]
 
-        # Skipping dashboard loading to speed up tests
+        # Skipping dashboard loading to speed up tests, unfortunately only works for setup and not --setup
         cmd += ["-E", "setup.dashboards.enabled=false"]
-        cmd += ["setup", "--machine-learning"]
+
+        if setup_flag:
+            cmd += ["--setup"]
+        else:
+            cmd += ["setup", "--machine-learning"]
+
         if modules_flag:
             cmd += ["--modules=nginx"]
 
@@ -119,12 +114,12 @@ class Test(BaseTest):
                                 bufsize=0)
 
         # Check result
-        self.wait_until(lambda: "filebeat-nginx_ecs-access-status_code_rate_ecs" in
+        self.wait_until(lambda: "filebeat-nginx-access-response_code" in
                                 (df["job_id"] for df in self.es.transport.perform_request(
-                                    "GET", ml_anomaly_detectors_url)["jobs"]),
+                                    "GET", "/_xpack/ml/anomaly_detectors/")["jobs"]),
                         max_timeout=60)
-        self.wait_until(lambda: "datafeed-filebeat-nginx_ecs-access-status_code_rate_ecs" in
-                                (df["datafeed_id"] for df in self.es.transport.perform_request("GET", ml_datafeeds_url)["datafeeds"]))
+        self.wait_until(lambda: "datafeed-filebeat-nginx-access-response_code" in
+                                (df["datafeed_id"] for df in self.es.transport.perform_request("GET", "/_xpack/ml/datafeeds/")["datafeeds"]))
 
         beat.kill()
 

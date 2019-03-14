@@ -9,21 +9,18 @@
       type: group
       fields:
         - name: container.id
-          type: alias
-          path: container.id
-          migration: true
-
+          type: keyword
+          description: >
+            Unique container id.
         - name: container.image
-          type: alias
-          path: container.image.name
-          migration: true
-
+          type: keyword
+          description: >
+            Name of the image the container was built on.
         - name: container.name
-          type: alias
-          path: container.name
-          migration: true
-
-        - name: container.labels  # TODO: How to map these?
+          type: keyword
+          description: >
+            Container name.
+        - name: container.labels
           type: object
           object_type: keyword
           description: >

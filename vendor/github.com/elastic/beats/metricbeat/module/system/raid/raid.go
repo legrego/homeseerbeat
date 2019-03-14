@@ -74,13 +74,14 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 }
 
 // Fetch fetches one event for each device
-func (m *MetricSet) Fetch(r mb.ReporterV2) {
+func (m *MetricSet) Fetch() ([]common.MapStr, error) {
+
 	stats, err := m.fs.ParseMDStat()
 	if err != nil {
-		r.Error(errors.Wrap(err, "failed to parse mdstat"))
-		return
+		return nil, err
 	}
 
+	events := make([]common.MapStr, 0, len(stats))
 	for _, stat := range stats {
 		event := common.MapStr{
 			"name":           stat.Name,
@@ -94,9 +95,8 @@ func (m *MetricSet) Fetch(r mb.ReporterV2) {
 				"total":  stat.BlocksTotal,
 			},
 		}
-
-		r.Event(mb.Event{
-			MetricSetFields: event,
-		})
+		events = append(events, event)
 	}
+
+	return events, nil
 }

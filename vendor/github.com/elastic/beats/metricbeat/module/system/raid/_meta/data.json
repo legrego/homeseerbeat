@@ -1,19 +1,13 @@
 {
     "@timestamp": "2017-10-12T08:05:34.853Z",
-    "agent": {
+    "beat": {
         "hostname": "host.example.com",
         "name": "host.example.com"
     },
-    "event": {
-        "dataset": "system.raid",
-        "duration": 115000,
-        "module": "system"
-    },
     "metricset": {
-        "name": "raid"
-    },
-    "service": {
-        "type": "system"
+        "module": "system",
+        "name": "raid",
+        "rtt": 115
     },
     "system": {
         "raid": {

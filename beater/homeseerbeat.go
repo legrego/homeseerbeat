@@ -9,7 +9,6 @@ import (
 	"github.com/elastic/beats/libbeat/logp"
 
 	"github.com/legrego/homeseerbeat/config"
-	"github.com/legrego/homeseerbeat/readers"
 )
 
 // Homeseerbeat configuration.
@@ -43,36 +42,25 @@ func (bt *Homeseerbeat) Run(b *beat.Beat) error {
 		return err
 	}
 
-	readers.InitLogReader(bt.config.HomeSeerLogPath)
-
-	ticker := time.NewTicker(bt.config.Poll)
+	ticker := time.NewTicker(bt.config.Period)
+	counter := 1
 	for {
 		select {
 		case <-bt.done:
-			readers.CloseLogReader()
 			return nil
 		case <-ticker.C:
 		}
 
-		results, err := readers.ReadLogs(bt.config.StatePath, bt.config.LogBatchSize)
-		if err != nil {
-			return err
+		event := beat.Event{
+			Timestamp: time.Now(),
+			Fields: common.MapStr{
+				"type":    b.Info.Name,
+				"counter": counter,
+			},
 		}
-
-		for _, result := range results {
-			bt.client.Publish(beat.Event{
-				Timestamp: result.Datetime,
-				Fields: common.MapStr{
-					"event.id":       result.ID,
-					"event.module":   result.LogType,
-					"event.created":  time.Now(),
-					"event.severity": result.LogPriority,
-					"message":        result.LogEntry,
-				},
-			})
-		}
-
-		logp.Info("Events sent")
+		bt.client.Publish(event)
+		logp.Info("Event sent")
+		counter++
 	}
 }
 

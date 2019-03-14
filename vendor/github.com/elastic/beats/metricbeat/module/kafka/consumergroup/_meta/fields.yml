@@ -40,7 +40,7 @@
       description: consumer offset into partition being read
 
     - name: meta
-      type: keyword
+      type: text
       description: custom consumer meta data string
 
     - name: error.code

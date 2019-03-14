@@ -9,20 +9,10 @@ from beat.beat import TestCase
 from beat.beat import Proc
 
 TRANS_REQUIRED_FIELDS = ["@timestamp", "type", "status",
-                         "agent.type", "agent.hostname", "agent.version",
-                         "event.kind", "event.category", "event.dataset", "event.start",
-                         "source.ip", "destination.ip",
-                         "client.ip", "server.ip",
-                         "network.type", "network.transport", "network.community_id",
-                         ]
+                         "beat.name", "beat.hostname", "beat.version"]
 
 FLOWS_REQUIRED_FIELDS = ["@timestamp", "type",
-                         "agent.type", "agent.hostname", "agent.version",
-                         "event.kind", "event.category", "event.dataset", "event.action", "event.start", "event.end", "event.duration",
-                         "source.ip", "destination.ip",
-                         "flow.id",
-                         "network.type", "network.transport", "network.community_id",
-                         ]
+                         "beat.name", "beat.hostname", "beat.version"]
 
 
 class BaseTest(TestCase):
@@ -60,11 +50,8 @@ class BaseTest(TestCase):
             "-I", os.path.join(self.beat_path + "/tests/system/pcaps", pcap),
             "-c", os.path.join(self.working_dir, config),
             "-systemTest",
+            "-test.coverprofile", os.path.join(self.working_dir, "coverage.cov"),
         ])
-        if os.getenv("TEST_COVERAGE") == "true":
-            args += [
-                "-test.coverprofile", os.path.join(self.working_dir, "coverage.cov"),
-            ]
 
         if extra_args:
             args.extend(extra_args)
@@ -105,11 +92,8 @@ class BaseTest(TestCase):
                 "-e",
                 "-c", os.path.join(self.working_dir, config),
                 "-systemTest",
+                "-test.coverprofile", os.path.join(self.working_dir, "coverage.cov")
                 ]
-        if os.getenv("TEST_COVERAGE") == "true":
-            args += [
-                "-test.coverprofile", os.path.join(self.working_dir, "coverage.cov"),
-            ]
 
         if extra_args:
             args.extend(extra_args)
@@ -137,5 +121,5 @@ class BaseTest(TestCase):
 
     def setUp(self):
 
-        self.expected_fields, self.dict_fields, _ = self.load_fields()
+        self.expected_fields, self.dict_fields = self.load_fields()
         super(BaseTest, self).setUp()

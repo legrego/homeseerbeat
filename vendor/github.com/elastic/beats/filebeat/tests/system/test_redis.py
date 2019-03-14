@@ -45,6 +45,7 @@ class Test(BaseTest):
 
         output = self.read_output()[0]
 
+        assert output["prospector.type"] == "redis"
         assert output["input.type"] == "redis"
         assert "redis.slowlog.cmd" in output
 

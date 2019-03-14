@@ -147,7 +147,7 @@ var (
 			"get":        c.Dict("get", threadPoolStatsSchema),
 			"management": c.Dict("management", threadPoolStatsSchema),
 			"search":     c.Dict("search", threadPoolStatsSchema),
-			"watcher":    c.Dict("watcher", threadPoolStatsSchema, c.DictOptional),
+			"watcher":    c.Dict("watcher", threadPoolStatsSchema),
 		}),
 		"fs": c.Dict("fs", s.Schema{
 			"total": c.Dict("total", s.Schema{

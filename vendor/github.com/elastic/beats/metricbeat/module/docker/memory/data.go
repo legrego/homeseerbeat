@@ -22,14 +22,19 @@ import (
 	"github.com/elastic/beats/metricbeat/mb"
 )
 
-func eventsMapping(r mb.ReporterV2, memoryDataList []MemoryData) {
+func eventsMapping(memoryDataList []MemoryData) []common.MapStr {
+	events := []common.MapStr{}
 	for _, memoryData := range memoryDataList {
-		eventMapping(r, &memoryData)
+		events = append(events, eventMapping(&memoryData))
 	}
+	return events
 }
 
-func eventMapping(r mb.ReporterV2, memoryData *MemoryData) {
-	fields := common.MapStr{
+func eventMapping(memoryData *MemoryData) common.MapStr {
+	event := common.MapStr{
+		mb.ModuleDataKey: common.MapStr{
+			"container": memoryData.Container.ToMapStr(),
+		},
 		"fail": common.MapStr{
 			"count": memoryData.Failcnt,
 		},
@@ -44,9 +49,5 @@ func eventMapping(r mb.ReporterV2, memoryData *MemoryData) {
 			"max":   memoryData.MaxUsage,
 		},
 	}
-
-	r.Event(mb.Event{
-		RootFields:      memoryData.Container.ToMapStr(),
-		MetricSetFields: fields,
-	})
+	return event
 }

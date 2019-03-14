@@ -1,6 +1,6 @@
 - name: status
   type: group
-  release: ga
+  release: beta
   description: >
     uwsgi.status metricset fields
   fields:

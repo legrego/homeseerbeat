@@ -31,9 +31,7 @@ import (
 type Queue struct {
 	accessor access
 
-	id        queueID
-	version   uint32
-	hdrOffset uintptr
+	id queueID
 
 	// TODO: add support for multiple named readers with separate ACK handling.
 
@@ -68,8 +66,6 @@ type Settings struct {
 	// Optional ACK callback. Will be use to notify number of events being successfully
 	// ACKed and pages being freed.
 	ACKed func(event, pages uint)
-
-	Observer Observer
 }
 
 // MakeRoot prepares the queue header (empty queue).
@@ -117,6 +113,7 @@ func New(delegate Delegate, settings Settings) (*Queue, error) {
 
 	root := castQueueRootPage(rootBuf[:])
 	if root.version.Get() != queueVersion {
+
 		cause := &Error{
 			kind: InitFailed,
 			msg:  fmt.Sprintf("queue version %v", root.version.Get()),
@@ -126,21 +123,7 @@ func New(delegate Delegate, settings Settings) (*Queue, error) {
 
 	tracef("open queue: %p (pageSize: %v)\n", q, pageSize)
 	traceQueueHeader(root)
-
-	q.version = root.version.Get()
-	q.hdrOffset = q.accessor.RootFileOffset()
-	q.onInit()
 	return q, nil
-}
-
-func (q *Queue) onInit() {
-	o := q.settings.Observer
-	if o == nil {
-		return
-	}
-
-	avail, _ := q.Active()
-	o.OnQueueInit(q.hdrOffset, q.version, avail)
 }
 
 // Close will try to flush the current write buffer,
@@ -211,7 +194,7 @@ func (q *Queue) Writer() (*Writer, error) {
 
 	writeBuffer := q.settings.WriteBuffer
 	flushed := q.settings.Flushed
-	writer, err := newWriter(&q.accessor, q.hdrOffset, q.settings.Observer, q.pagePool, writeBuffer, tail, flushed)
+	writer, err := newWriter(&q.accessor, q.pagePool, writeBuffer, tail, flushed)
 	if err != nil {
 		return nil, q.accessor.errWrap(op, err)
 	}
@@ -225,7 +208,7 @@ func (q *Queue) Writer() (*Writer, error) {
 // The reader is not thread safe.
 func (q *Queue) Reader() *Reader {
 	if q.reader == nil {
-		q.reader = newReader(q.settings.Observer, &q.accessor)
+		q.reader = newReader(&q.accessor)
 	}
 	return q.reader
 }
@@ -244,7 +227,7 @@ func (q *Queue) Active() (uint, error) {
 
 func (q *Queue) getAcker() *acker {
 	if q.acker == nil {
-		q.acker = newAcker(&q.accessor, q.hdrOffset, q.settings.Observer, q.settings.ACKed)
+		q.acker = newAcker(&q.accessor, q.settings.ACKed)
 	}
 	return q.acker
 }

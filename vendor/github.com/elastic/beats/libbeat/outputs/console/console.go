@@ -53,7 +53,6 @@ func init() {
 }
 
 func makeConsole(
-	_ outputs.IndexManager,
 	beat beat.Info,
 	observer outputs.Observer,
 	cfg *common.Config,
@@ -71,10 +70,7 @@ func makeConsole(
 			return outputs.Fail(err)
 		}
 	} else {
-		enc = json.New(beat.Version, json.Config{
-			Pretty:     config.Pretty,
-			EscapeHTML: false,
-		})
+		enc = json.New(config.Pretty, true, beat.Version)
 	}
 
 	index := beat.Beat

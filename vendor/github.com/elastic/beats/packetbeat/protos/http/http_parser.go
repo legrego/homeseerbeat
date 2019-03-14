@@ -42,7 +42,7 @@ type message struct {
 
 	isRequest    bool
 	tcpTuple     common.TCPTuple
-	cmdlineTuple *common.ProcessTuple
+	cmdlineTuple *common.CmdlineTuple
 	direction    uint8
 
 	//Request Info
@@ -53,15 +53,12 @@ type message struct {
 	realIP       common.NetString
 
 	// Http Headers
-	contentLength int
-	contentType   common.NetString
-	host          common.NetString
-	referer       common.NetString
-	userAgent     common.NetString
-	encodings     []string
-	isChunked     bool
-	headers       map[string]common.NetString
-	size          uint64
+	contentLength    int
+	contentType      common.NetString
+	transferEncoding common.NetString
+	isChunked        bool
+	headers          map[string]common.NetString
+	size             uint64
 
 	rawHeaders []byte
 
@@ -73,9 +70,7 @@ type message struct {
 	saveBody bool
 	body     []byte
 
-	notes          []string
-	packetLossReq  bool
-	packetLossResp bool
+	notes []string
 
 	next *message
 }
@@ -83,13 +78,6 @@ type message struct {
 type version struct {
 	major uint8
 	minor uint8
-}
-
-func (v version) String() string {
-	if v.major == 1 && v.minor == 1 {
-		return "1.1"
-	}
-	return fmt.Sprintf("%d.%d", v.major, v.minor)
 }
 
 type parser struct {
@@ -106,7 +94,7 @@ type parserConfig struct {
 }
 
 var (
-	transferEncodingChunked = "chunked"
+	transferEncodingChunked = []byte("chunked")
 
 	constCRLF = []byte("\r\n")
 
@@ -117,11 +105,7 @@ var (
 	nameContentLength    = []byte("content-length")
 	nameContentType      = []byte("content-type")
 	nameTransferEncoding = []byte("transfer-encoding")
-	nameContentEncoding  = []byte("content-encoding")
 	nameConnection       = []byte("connection")
-	nameHost             = []byte("host")
-	nameReferer          = []byte("referer")
-	nameUserAgent        = []byte("user-agent")
 )
 
 func newParser(config *parserConfig) *parser {
@@ -382,35 +366,14 @@ func (parser *parser) parseHeader(m *message, data []byte) (bool, bool, int) {
 			} else if bytes.Equal(headerName, nameContentType) {
 				m.contentType = headerVal
 			} else if bytes.Equal(headerName, nameTransferEncoding) {
-				encodings := parseCommaSeparatedList(headerVal)
-				// 'chunked' can only appear at the end
-				if n := len(encodings); n > 0 && encodings[n-1] == transferEncodingChunked {
-					m.isChunked = true
-					encodings = encodings[:n-1]
-				}
-				if len(encodings) > 0 {
-					// Append at the end of encodings. If a content-encoding
-					// header is also present, it was applied by sender before
-					// transfer-encoding.
-					m.encodings = append(m.encodings, encodings...)
-				}
-			} else if bytes.Equal(headerName, nameContentEncoding) {
-				encodings := parseCommaSeparatedList(headerVal)
-				// Append at the beginning of m.encodings, as Content-Encoding
-				// is supposed to be applied before Transfer-Encoding.
-				m.encodings = append(encodings, m.encodings...)
+				m.isChunked = bytes.Equal(common.NetString(headerVal), transferEncodingChunked)
 			} else if bytes.Equal(headerName, nameConnection) {
 				m.connection = headerVal
-			} else if len(config.realIPHeader) > 0 && bytes.Equal(headerName, []byte(config.realIPHeader)) {
+			}
+			if len(config.realIPHeader) > 0 && bytes.Equal(headerName, []byte(config.realIPHeader)) {
 				if ips := bytes.SplitN(headerVal, []byte{','}, 2); len(ips) > 0 {
 					m.realIP = trim(ips[0])
 				}
-			} else if bytes.Equal(headerName, nameHost) {
-				m.host = headerVal
-			} else if bytes.Equal(headerName, nameReferer) {
-				m.referer = headerVal
-			} else if bytes.Equal(headerName, nameUserAgent) {
-				m.userAgent = headerVal
 			}
 
 			if config.sendHeaders {
@@ -437,15 +400,6 @@ func (parser *parser) parseHeader(m *message, data []byte) (bool, bool, int) {
 	}
 
 	return true, false, len(data)
-}
-
-func parseCommaSeparatedList(s common.NetString) (list []string) {
-	values := bytes.Split(s, []byte(","))
-	list = make([]string, len(values))
-	for idx := range values {
-		list[idx] = string(bytes.ToLower(bytes.Trim(values[idx], " ")))
-	}
-	return list
 }
 
 func (*parser) parseBody(s *stream, m *message) (ok, complete bool) {

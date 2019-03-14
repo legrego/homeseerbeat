@@ -57,7 +57,6 @@ func eventually(t *testing.T, predicate func() (bool, error), timeout time.Durat
 
 // Test that a write is triggered when the maximum number of updates is reached.
 func TestWriteMaxUpdates(t *testing.T) {
-	t.Skip("Duplicate of winlogbeat/checkpoint")
 	dir, err := ioutil.TempDir("", "wlb-checkpoint-test")
 	if err != nil {
 		t.Fatal(err)
@@ -111,7 +110,6 @@ func TestWriteMaxUpdates(t *testing.T) {
 // Test that a write is triggered when the maximum time period since the last
 // write is reached.
 func TestWriteTimedFlush(t *testing.T) {
-	t.Skip("Duplicate of winlogbeat/checkpoint")
 	dir, err := ioutil.TempDir("", "wlb-checkpoint-test")
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +152,6 @@ func TestWriteTimedFlush(t *testing.T) {
 
 // Test that createDir creates the directory with 0750 permissions.
 func TestCreateDir(t *testing.T) {
-	t.Skip("Duplicate of winlogbeat/checkpoint")
 	dir, err := ioutil.TempDir("", "wlb-checkpoint-test")
 	if err != nil {
 		t.Fatal(err)
@@ -194,7 +191,6 @@ func TestCreateDir(t *testing.T) {
 // Test createDir when the directory already exists to verify that no error is
 // returned.
 func TestCreateDirAlreadyExists(t *testing.T) {
-	t.Skip("Duplicate of winlogbeat/checkpoint")
 	dir, err := ioutil.TempDir("", "wlb-checkpoint-test")
 	if err != nil {
 		t.Fatal(err)

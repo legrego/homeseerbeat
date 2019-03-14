@@ -27,6 +27,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	tml "golang.org/x/crypto/ssh/terminal"
 
 	"github.com/elastic/beats/libbeat/cmd/instance"
@@ -35,14 +36,14 @@ import (
 	"github.com/elastic/beats/libbeat/keystore"
 )
 
-func getKeystore(settings instance.Settings) (keystore.Keystore, error) {
-	b, err := instance.NewBeat(settings.Name, settings.IndexPrefix, settings.Version)
+func getKeystore(name, version string) (keystore.Keystore, error) {
+	b, err := instance.NewBeat(name, "", version)
 
 	if err != nil {
 		return nil, fmt.Errorf("error initializing beat: %s", err)
 	}
 
-	if err = b.InitWithSettings(settings); err != nil {
+	if err = b.Init(); err != nil {
 		return nil, fmt.Errorf("error initializing beat: %s", err)
 	}
 
@@ -55,41 +56,44 @@ func getKeystore(settings instance.Settings) (keystore.Keystore, error) {
 //  - add
 //  - remove
 //  - list
-func genKeystoreCmd(settings instance.Settings) *cobra.Command {
+func genKeystoreCmd(
+	name, idxPrefix, version string,
+	runFlags *pflag.FlagSet,
+) *cobra.Command {
 	keystoreCmd := cobra.Command{
 		Use:   "keystore",
 		Short: "Manage secrets keystore",
 	}
 
-	keystoreCmd.AddCommand(genCreateKeystoreCmd(settings))
-	keystoreCmd.AddCommand(genAddKeystoreCmd(settings))
-	keystoreCmd.AddCommand(genRemoveKeystoreCmd(settings))
-	keystoreCmd.AddCommand(genListKeystoreCmd(settings))
+	keystoreCmd.AddCommand(genCreateKeystoreCmd(name, version))
+	keystoreCmd.AddCommand(genAddKeystoreCmd(name, version))
+	keystoreCmd.AddCommand(genRemoveKeystoreCmd(name, version))
+	keystoreCmd.AddCommand(genListKeystoreCmd(name, version))
 
 	return &keystoreCmd
 }
 
-func genCreateKeystoreCmd(settings instance.Settings) *cobra.Command {
+func genCreateKeystoreCmd(name, version string) *cobra.Command {
 	var flagForce bool
 	command := &cobra.Command{
 		Use:   "create",
 		Short: "Create keystore",
 		Run: cli.RunWith(func(cmd *cobra.Command, args []string) error {
-			return createKeystore(settings, flagForce)
+			return createKeystore(name, version, flagForce)
 		}),
 	}
 	command.Flags().BoolVar(&flagForce, "force", false, "override the existing keystore")
 	return command
 }
 
-func genAddKeystoreCmd(settings instance.Settings) *cobra.Command {
+func genAddKeystoreCmd(name, version string) *cobra.Command {
 	var flagForce bool
 	var flagStdin bool
 	command := &cobra.Command{
 		Use:   "add",
 		Short: "Add secret",
 		Run: cli.RunWith(func(cmd *cobra.Command, args []string) error {
-			store, err := getKeystore(settings)
+			store, err := getKeystore(name, version)
 			if err != nil {
 				return err
 			}
@@ -101,12 +105,12 @@ func genAddKeystoreCmd(settings instance.Settings) *cobra.Command {
 	return command
 }
 
-func genRemoveKeystoreCmd(settings instance.Settings) *cobra.Command {
+func genRemoveKeystoreCmd(name, version string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove",
 		Short: "remove secret",
 		Run: cli.RunWith(func(cmd *cobra.Command, args []string) error {
-			store, err := getKeystore(settings)
+			store, err := getKeystore(name, version)
 			if err != nil {
 				return err
 			}
@@ -115,12 +119,12 @@ func genRemoveKeystoreCmd(settings instance.Settings) *cobra.Command {
 	}
 }
 
-func genListKeystoreCmd(settings instance.Settings) *cobra.Command {
+func genListKeystoreCmd(name, version string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List keystore",
 		Run: cli.RunWith(func(cmd *cobra.Command, args []string) error {
-			store, err := getKeystore(settings)
+			store, err := getKeystore(name, version)
 			if err != nil {
 				return err
 			}
@@ -129,8 +133,8 @@ func genListKeystoreCmd(settings instance.Settings) *cobra.Command {
 	}
 }
 
-func createKeystore(settings instance.Settings, force bool) error {
-	store, err := getKeystore(settings)
+func createKeystore(name, version string, force bool) error {
+	store, err := getKeystore(name, version)
 	if err != nil {
 		return err
 	}
@@ -152,7 +156,7 @@ func createKeystore(settings instance.Settings, force bool) error {
 			return fmt.Errorf("Error creating the keystore: %s", err)
 		}
 	}
-	fmt.Printf("Created %s keystore\n", settings.Name)
+	fmt.Printf("Created %s keystore\n", name)
 	return nil
 }
 

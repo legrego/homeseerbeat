@@ -2,7 +2,7 @@
   type: group
   description: >
     Contains etcd leader statistics.
-  release: ga
+  release: beta
   fields:
     - name: followers.counts
       type: group
@@ -11,10 +11,8 @@
       fields:
         - name: followers.counts.success
           type: integer
-          description: successful Raft RPC requests
         - name: followers.counts.fail
           type: integer
-          description: failed Raft RPC requests
 
 
     - name: followers.latency
@@ -34,5 +32,4 @@
           type: scaled_float
     - name: leader
       type: keyword
-      description: ID of actual leader
 

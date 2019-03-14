@@ -382,9 +382,7 @@
         Server info
       fields:
         - name: version
-          type: alias
-          path: service.version
-          migration: true
+          type: keyword
           description:
 
         - name: git_sha1
@@ -404,9 +402,7 @@
           description:
 
         - name: os
-          type: alias
-          path: os.full
-          migration: true
+          type: keyword
           description:
 
         - name: arch_bits
@@ -422,9 +418,7 @@
           description:
 
         - name: process_id
-          type: alias
-          path: process.pid
-          migration: true
+          type: long
           description:
 
         - name: run_id

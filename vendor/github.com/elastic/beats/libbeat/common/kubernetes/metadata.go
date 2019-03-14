@@ -44,8 +44,6 @@ type MetaGeneratorConfig struct {
 
 	// Undocumented settings, to be deprecated in favor of `drop_fields` processor:
 	IncludeCreatorMetadata bool `config:"include_creator_metadata"`
-	LabelsDedot            bool `config:"labels.dedot"`
-	AnnotationsDedot       bool `config:"annotations.dedot"`
 }
 
 type metaGenerator = MetaGeneratorConfig
@@ -55,8 +53,6 @@ func NewMetaGenerator(cfg *common.Config) (MetaGenerator, error) {
 	// default settings:
 	generator := metaGenerator{
 		IncludeCreatorMetadata: true,
-		LabelsDedot:            true,
-		AnnotationsDedot:       true,
 	}
 
 	err := cfg.Unpack(&generator)
@@ -74,23 +70,18 @@ func (g *metaGenerator) ResourceMetadata(obj Resource) common.MapStr {
 	labelMap := common.MapStr{}
 	if len(g.IncludeLabels) == 0 {
 		for k, v := range obj.GetMetadata().Labels {
-			if g.LabelsDedot {
-				label := common.DeDot(k)
-				labelMap.Put(label, v)
-			} else {
-				safemapstr.Put(labelMap, k, v)
-			}
+			safemapstr.Put(labelMap, k, v)
 		}
 	} else {
-		labelMap = generateMapSubset(objMeta.Labels, g.IncludeLabels, g.LabelsDedot)
+		labelMap = generateMapSubset(objMeta.Labels, g.IncludeLabels)
 	}
 
 	// Exclude any labels that are present in the exclude_labels config
 	for _, label := range g.ExcludeLabels {
-		labelMap.Delete(label)
+		delete(labelMap, label)
 	}
 
-	annotationsMap := generateMapSubset(objMeta.Annotations, g.IncludeAnnotations, g.AnnotationsDedot)
+	annotationsMap := generateMapSubset(objMeta.Annotations, g.IncludeAnnotations)
 	meta := common.MapStr{}
 	if objMeta.GetNamespace() != "" {
 		meta["namespace"] = objMeta.GetNamespace()
@@ -145,7 +136,7 @@ func (g *metaGenerator) ContainerMetadata(pod *Pod, container string) common.Map
 	return podMeta
 }
 
-func generateMapSubset(input map[string]string, keys []string, dedot bool) common.MapStr {
+func generateMapSubset(input map[string]string, keys []string) common.MapStr {
 	output := common.MapStr{}
 	if input == nil {
 		return output
@@ -154,12 +145,7 @@ func generateMapSubset(input map[string]string, keys []string, dedot bool) commo
 	for _, key := range keys {
 		value, ok := input[key]
 		if ok {
-			if dedot {
-				dedotKey := common.DeDot(key)
-				output.Put(dedotKey, value)
-			} else {
-				safemapstr.Put(output, key, value)
-			}
+			safemapstr.Put(output, key, value)
 		}
 	}
 

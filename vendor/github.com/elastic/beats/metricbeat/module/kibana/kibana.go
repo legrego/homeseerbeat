@@ -30,15 +30,15 @@ import (
 	"github.com/elastic/beats/metricbeat/mb"
 )
 
-// ModuleName is the name of this module
-const ModuleName = "kibana"
+const (
+	// ModuleName is the name of this module
+	ModuleName = "kibana"
 
-var (
 	// StatsAPIAvailableVersion is the version of Kibana since when the stats API is available
-	StatsAPIAvailableVersion = common.MustNewVersion("6.4.0")
+	StatsAPIAvailableVersion = "6.4.0"
 
 	// SettingsAPIAvailableVersion is the version of Kibana since when the settings API is available
-	SettingsAPIAvailableVersion = common.MustNewVersion("6.5.0")
+	SettingsAPIAvailableVersion = "6.5.0"
 )
 
 // ReportErrorForMissingField reports and returns an error message for the given
@@ -50,34 +50,39 @@ func ReportErrorForMissingField(field string, r mb.ReporterV2) error {
 }
 
 // GetVersion returns the version of the Kibana instance
-func GetVersion(http *helper.HTTP, currentPath string) (*common.Version, error) {
+func GetVersion(http *helper.HTTP, currentPath string) (string, error) {
 	const statusPath = "api/status"
 	content, err := fetchPath(http, currentPath, statusPath)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	var status struct {
-		Version struct {
-			Number string `json:"number"`
-		} `json:"version"`
-	}
-
-	err = json.Unmarshal(content, &status)
+	var data common.MapStr
+	err = json.Unmarshal(content, &data)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return common.NewVersion(status.Version.Number)
+	version, err := data.GetValue("version.number")
+	if err != nil {
+		return "", err
+	}
+
+	versionStr, ok := version.(string)
+	if !ok {
+		return "", fmt.Errorf("Could not parse Kibana version in status API response")
+	}
+
+	return versionStr, nil
 }
 
 // IsStatsAPIAvailable returns whether the stats API is available in the given version of Kibana
-func IsStatsAPIAvailable(currentKibanaVersion *common.Version) bool {
+func IsStatsAPIAvailable(currentKibanaVersion string) (bool, error) {
 	return elastic.IsFeatureAvailable(currentKibanaVersion, StatsAPIAvailableVersion)
 }
 
 // IsSettingsAPIAvailable returns whether the settings API is available in the given version of Kibana
-func IsSettingsAPIAvailable(currentKibanaVersion *common.Version) bool {
+func IsSettingsAPIAvailable(currentKibanaVersion string) (bool, error) {
 	return elastic.IsFeatureAvailable(currentKibanaVersion, SettingsAPIAvailableVersion)
 }
 

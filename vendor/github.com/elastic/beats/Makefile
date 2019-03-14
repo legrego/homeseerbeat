@@ -16,17 +16,12 @@ XPACK_SUFFIX=x-pack/
 # PROJECTS_XPACK_PKG is a list of Beats that have independent packaging support
 # in the x-pack directory (rather than having the OSS build produce both sets
 # of artifacts). This will be removed once we complete the transition.
-PROJECTS_XPACK_PKG=x-pack/auditbeat x-pack/filebeat x-pack/metricbeat
+PROJECTS_XPACK_PKG=x-pack/auditbeat
 # PROJECTS_XPACK_MAGE is a list of Beats whose primary build logic is based in
 # Mage. For compatibility with CI testing these projects support a subset of the
 # makefile targets. After all Beats converge to primarily using Mage we can
 # remove this and treat all sub-projects the same.
-PROJECTS_XPACK_MAGE=$(PROJECTS_XPACK_PKG)
-
-#
-# Includes
-#
-include dev-tools/make/mage.mk
+PROJECTS_XPACK_MAGE=x-pack/filebeat $(PROJECTS_XPACK_PKG)
 
 # Runs complete testsuites (unit, system, integration) for all beats with coverage and race detection.
 # Also it builds the docs and the generators
@@ -77,7 +72,7 @@ clean:
 	@rm -rf build
 	@$(foreach var,$(PROJECTS) $(PROJECTS_XPACK_MAGE),$(MAKE) -C $(var) clean || exit 1;)
 	@$(MAKE) -C generator clean
-	@-mage -clean
+	@-mage -clean 2> /dev/null
 
 # Cleans up the vendor directory from unnecessary files
 # This should always be run after updating the dependencies
@@ -99,7 +94,7 @@ check: python-env
 
 .PHONY: check-headers
 check-headers:
-	@go get -u github.com/elastic/go-licenser
+	@go get github.com/elastic/go-licenser
 	@go-licenser -d -exclude x-pack
 	@go-licenser -d -license Elastic x-pack
 
@@ -181,6 +176,11 @@ release-manager-snapshot:
 .PHONY: release-manager-release
 release-manager-release:
 	./dev-tools/run_with_go_ver $(MAKE) release
+
+# Installs the mage build tool from the vendor directory.
+.PHONY: mage
+mage:
+	@go install github.com/elastic/beats/vendor/github.com/magefile/mage
 
 # Collects dashboards from all Beats and generates a zip file distribution.
 .PHONY: beats-dashboards

@@ -18,7 +18,7 @@
 package collstats
 
 import (
-	"github.com/pkg/errors"
+	"errors"
 
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
@@ -26,7 +26,7 @@ import (
 	"github.com/elastic/beats/metricbeat/module/mongodb"
 )
 
-var logger = logp.NewLogger("mongodb.collstats")
+var debugf = logp.MakeDebug("mongodb.collstats")
 
 func init() {
 	mb.Registry.MustAddMetricSet("mongodb", "collstats", New,
@@ -54,16 +54,17 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	return &MetricSet{ms}, nil
 }
 
-// Fetch methods implements the data gathering and data conversion to the right
-// format. It publishes the event which is then forwarded to the output. In case
-// of an error set the Error field of mb.Event or simply call report.Error().
-func (m *MetricSet) Fetch(reporter mb.ReporterV2) {
+// Fetch methods implements the data gathering and data conversion to the right format
+// It returns the event which is then forward to the output. In case of an error, a
+// descriptive error must be returned.
+func (m *MetricSet) Fetch() ([]common.MapStr, error) {
+	// events is the list of events collected from each of the collections.
+	var events []common.MapStr
+
 	// instantiate direct connections to each of the configured Mongo hosts
 	mongoSession, err := mongodb.NewDirectSession(m.DialInfo)
 	if err != nil {
-		logger.Error(err)
-		reporter.Error(err)
-		return
+		return nil, err
 	}
 	defer mongoSession.Close()
 
@@ -71,25 +72,21 @@ func (m *MetricSet) Fetch(reporter mb.ReporterV2) {
 
 	err = mongoSession.Run("top", &result)
 	if err != nil {
-		err = errors.Wrap(err, "Error retrieving collection totals from Mongo instance")
-		logger.Error(err)
-		reporter.Error(err)
-		return
+		logp.Err("Error retrieving collection totals from Mongo instance")
+		return events, err
 	}
 
 	if _, ok := result["totals"]; !ok {
 		err = errors.New("Error accessing collection totals in returned data")
-		logger.Error(err)
-		reporter.Error(err)
-		return
+		logp.Err(err.Error())
+		return events, err
 	}
 
 	totals, ok := result["totals"].(common.MapStr)
 	if !ok {
 		err = errors.New("Collection totals are not a map")
-		logger.Error(err)
-		reporter.Error(err)
-		return
+		logp.Err(err.Error())
+		return events, err
 	}
 
 	for group, info := range totals {
@@ -100,21 +97,18 @@ func (m *MetricSet) Fetch(reporter mb.ReporterV2) {
 		infoMap, ok := info.(common.MapStr)
 		if !ok {
 			err = errors.New("Unexpected data returned by mongodb")
-			logger.Error(err)
-			reporter.Error(err)
+			logp.Err(err.Error())
 			continue
 		}
 
 		event, err := eventMapping(group, infoMap)
 		if err != nil {
-			err = errors.Wrap(err, "Mapping of the event data filed")
-			logger.Error(err)
-			reporter.Error(err)
+			logp.Err("Mapping of the event data filed")
 			continue
 		}
 
-		reporter.Event(mb.Event{MetricSetFields: event})
+		events = append(events, event)
 	}
 
-	return
+	return events, nil
 }

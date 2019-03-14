@@ -1,6 +1,6 @@
 {
     "@timestamp": "2017-10-12T08:05:34.853Z",
-    "agent": {
+    "beat": {
         "hostname": "host.example.com",
         "name": "host.example.com"
     },
@@ -10,7 +10,7 @@
             "name": "rbd",
             "stats": {
                 "available": {
-                    "bytes": 0
+                    "bytes": 47478734249
                 },
                 "objects": 0,
                 "used": {
@@ -20,16 +20,10 @@
             }
         }
     },
-    "event": {
-        "dataset": "ceph.pool_disk",
-        "duration": 115000,
-        "module": "ceph"
-    },
     "metricset": {
-        "name": "pool_disk"
-    },
-    "service": {
-        "address": "127.0.0.1:5000",
-        "type": "ceph"
+        "host": "ceph:5000",
+        "module": "ceph",
+        "name": "pool_disk",
+        "rtt": 115
     }
 }

@@ -28,13 +28,13 @@ import (
 	"github.com/elastic/beats/libbeat/version"
 )
 
-func genVersionCmd(settings instance.Settings) *cobra.Command {
+func genVersionCmd(name, beatVersion string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Show current version info",
 		Run: cli.RunWith(
 			func(_ *cobra.Command, args []string) error {
-				beat, err := instance.NewBeat(settings.Name, settings.IndexPrefix, settings.Version)
+				beat, err := instance.NewBeat(name, "", beatVersion)
 				if err != nil {
 					return fmt.Errorf("error initializing beat: %s", err)
 				}

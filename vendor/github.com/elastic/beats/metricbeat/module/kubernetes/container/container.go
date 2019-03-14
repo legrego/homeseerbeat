@@ -18,9 +18,7 @@
 package container
 
 import (
-	"github.com/pkg/errors"
-
-	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
@@ -37,8 +35,6 @@ var (
 		DefaultScheme: defaultScheme,
 		DefaultPath:   defaultPath,
 	}.Build()
-
-	logger = logp.NewLogger("kubernetes.container")
 )
 
 // init registers the MetricSet with the central registry.
@@ -75,34 +71,25 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	}, nil
 }
 
-// Fetch methods implements the data gathering and data conversion to the right
-// format. It publishes the event which is then forwarded to the output. In case
-// of an error set the Error field of mb.Event or simply call report.Error().
-func (m *MetricSet) Fetch(reporter mb.ReporterV2) {
+// Fetch methods implements the data gathering and data conversion to the right format
+// It returns the event which is then forward to the output. In case of an error, a
+// descriptive error must be returned.
+func (m *MetricSet) Fetch() ([]common.MapStr, error) {
 	m.enricher.Start()
 
 	body, err := m.http.FetchContent()
 	if err != nil {
-		err = errors.Wrap(err, "error doing HTTP request to fetch 'container' Metricset data")
-		logger.Error(err)
-		reporter.Error(err)
-		return
+		return nil, err
 	}
 
 	events, err := eventMapping(body, util.PerfMetrics)
 	if err != nil {
-		logger.Error(err)
-		reporter.Error(err)
-		return
+		return nil, err
 	}
 
 	m.enricher.Enrich(events)
 
-	for _, e := range events {
-		reporter.Event(mb.Event{MetricSetFields: e})
-	}
-
-	return
+	return events, nil
 }
 
 // Close stops this metricset

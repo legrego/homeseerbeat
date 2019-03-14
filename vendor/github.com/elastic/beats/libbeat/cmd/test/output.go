@@ -24,30 +24,28 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/beats/libbeat/cmd/instance"
-	"github.com/elastic/beats/libbeat/idxmgmt"
 	"github.com/elastic/beats/libbeat/outputs"
 	"github.com/elastic/beats/libbeat/testing"
 )
 
-func GenTestOutputCmd(settings instance.Settings) *cobra.Command {
+func GenTestOutputCmd(name, beatVersion string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "output",
-		Short: "Test " + settings.Name + " can connect to the output by using the current settings",
+		Short: "Test " + name + " can connect to the output by using the current settings",
 		Run: func(cmd *cobra.Command, args []string) {
-			b, err := instance.NewBeat(settings.Name, settings.IndexPrefix, settings.Version)
+			b, err := instance.NewBeat(name, "", beatVersion)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error initializing beat: %s\n", err)
 				os.Exit(1)
 			}
 
-			err = b.InitWithSettings(settings)
+			err = b.Init()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error initializing beat: %s\n", err)
 				os.Exit(1)
 			}
 
-			im, _ := idxmgmt.DefaultSupport(nil, b.Info, nil)
-			output, err := outputs.Load(im, b.Info, nil, b.Config.Output.Name(), b.Config.Output.Config())
+			output, err := outputs.Load(b.Info, nil, b.Config.Output.Name(), b.Config.Output.Config())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error initializing output: %s\n", err)
 				os.Exit(1)

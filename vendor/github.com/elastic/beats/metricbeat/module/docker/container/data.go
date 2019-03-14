@@ -23,49 +23,39 @@ import (
 	"github.com/docker/docker/api/types"
 
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/docker"
 )
 
-func eventsMapping(r mb.ReporterV2, containersList []types.Container, dedot bool) {
+func eventsMapping(containersList []types.Container, dedot bool) []common.MapStr {
+	myEvents := []common.MapStr{}
 	for _, container := range containersList {
-		eventMapping(r, &container, dedot)
+		myEvents = append(myEvents, eventMapping(&container, dedot))
 	}
+	return myEvents
 }
 
-func eventMapping(r mb.ReporterV2, cont *types.Container, dedot bool) {
+func eventMapping(cont *types.Container, dedot bool) common.MapStr {
 	event := common.MapStr{
-		"container": common.MapStr{
-			"id": cont.ID,
-			"image": common.MapStr{
-				"name": cont.Image,
-			},
-			"name":    docker.ExtractContainerName(cont.Names),
-			"runtime": "docker",
+		"created":      common.Time(time.Unix(cont.Created, 0)),
+		"id":           cont.ID,
+		"name":         docker.ExtractContainerName(cont.Names),
+		"command":      cont.Command,
+		"image":        cont.Image,
+		"ip_addresses": extractIPAddresses(cont.NetworkSettings),
+		"size": common.MapStr{
+			"root_fs": cont.SizeRootFs,
+			"rw":      cont.SizeRw,
 		},
-		"docker": common.MapStr{
-			"container": common.MapStr{
-				"created":      common.Time(time.Unix(cont.Created, 0)),
-				"command":      cont.Command,
-				"ip_addresses": extractIPAddresses(cont.NetworkSettings),
-				"size": common.MapStr{
-					"root_fs": cont.SizeRootFs,
-					"rw":      cont.SizeRw,
-				},
-				"status": cont.Status,
-			},
-		},
+		"status": cont.Status,
 	}
 
 	labels := docker.DeDotLabels(cont.Labels, dedot)
 
 	if len(labels) > 0 {
-		event.Put("docker.container.labels", labels)
+		event["labels"] = labels
 	}
 
-	r.Event(mb.Event{
-		RootFields: event,
-	})
+	return event
 }
 
 func extractIPAddresses(networks *types.SummaryNetworkSettings) []string {

@@ -21,10 +21,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elastic/beats/libbeat/common"
-
 	"github.com/pkg/errors"
 
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/metricbeat/helper/elastic"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/elasticsearch"
@@ -48,6 +47,8 @@ type MetricSet struct {
 
 // New create a new instance of the MetricSet
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	cfgwarn.Beta("the " + base.FullyQualifiedName() + " metricset is beta")
+
 	ms, err := elasticsearch.NewMetricSet(base, ccrStatsPath)
 	if err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 
 // Fetch gathers stats for each follower shard from the _ccr/stats API
 func (m *MetricSet) Fetch(r mb.ReporterV2) {
-	isMaster, err := elasticsearch.IsMaster(m.HTTP, m.GetServiceURI())
+	isMaster, err := elasticsearch.IsMaster(m.HTTP, m.getServiceURI())
 	if err != nil {
 		err = errors.Wrap(err, "error determining if connected Elasticsearch node is master")
 		elastic.ReportAndLogError(err, r, m.Log)
@@ -70,15 +71,17 @@ func (m *MetricSet) Fetch(r mb.ReporterV2) {
 		return
 	}
 
-	info, err := elasticsearch.GetInfo(m.HTTP, m.GetServiceURI())
+	info, err := elasticsearch.GetInfo(m.HTTP, m.getServiceURI())
 	if err != nil {
 		elastic.ReportAndLogError(err, r, m.Log)
 		return
 	}
 
+	elasticsearchVersion := info.Version.Number
+
 	// CCR is only available in Trial or Platinum license of Elasticsearch. So we check
 	// the license first.
-	ccrUnavailableMessage, err := m.checkCCRAvailability(info.Version.Number)
+	ccrUnavailableMessage, err := m.checkCCRAvailability(elasticsearchVersion)
 	if err != nil {
 		err = errors.Wrap(err, "error determining if CCR is available")
 		elastic.ReportAndLogError(err, r, m.Log)
@@ -112,8 +115,8 @@ func (m *MetricSet) Fetch(r mb.ReporterV2) {
 	}
 }
 
-func (m *MetricSet) checkCCRAvailability(currentElasticsearchVersion *common.Version) (message string, err error) {
-	license, err := elasticsearch.GetLicense(m.HTTP, m.GetServiceURI())
+func (m *MetricSet) checkCCRAvailability(currentElasticsearchVersion string) (message string, err error) {
+	license, err := elasticsearch.GetLicense(m.HTTP, m.getServiceURI())
 	if err != nil {
 		return "", errors.Wrap(err, "error determining Elasticsearch license")
 	}
@@ -125,15 +128,23 @@ func (m *MetricSet) checkCCRAvailability(currentElasticsearchVersion *common.Ver
 		return
 	}
 
-	isAvailable := elastic.IsFeatureAvailable(currentElasticsearchVersion, elasticsearch.CCRStatsAPIAvailableVersion)
+	isAvailable, err := elastic.IsFeatureAvailable(currentElasticsearchVersion, elasticsearch.CCRStatsAPIAvailableVersion)
+	if err != nil {
+		return "", errors.Wrap(err, "error determining if CCR is available in current Elasticsearch version")
+	}
 
 	if !isAvailable {
 		metricsetName := m.FullyQualifiedName()
 		message = "the " + metricsetName + " is only supported with Elasticsearch >= " +
-			elasticsearch.CCRStatsAPIAvailableVersion.String() + ". " +
-			"You are currently running Elasticsearch " + currentElasticsearchVersion.String() + "."
+			elasticsearch.CCRStatsAPIAvailableVersion + ". " +
+			"You are currently running Elasticsearch " + currentElasticsearchVersion + "."
 		return
 	}
 
 	return "", nil
+}
+
+func (m *MetricSet) getServiceURI() string {
+	return m.HostData().SanitizedURI + ccrStatsPath
+
 }

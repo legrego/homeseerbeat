@@ -31,6 +31,8 @@ import (
 )
 
 type Config struct {
+	Name string `config:"name"`
+
 	URLs         []string      `config:"urls" validate:"required"`
 	ProxyURL     string        `config:"proxy_url"`
 	Timeout      time.Duration `config:"timeout"`
@@ -85,6 +87,7 @@ type compressionConfig struct {
 }
 
 var defaultConfig = Config{
+	Name:         "http",
 	Timeout:      16 * time.Second,
 	MaxRedirects: 10,
 	Mode:         monitors.DefaultIPSettings,

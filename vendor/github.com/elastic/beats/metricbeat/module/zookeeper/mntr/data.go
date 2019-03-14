@@ -23,11 +23,9 @@ import (
 	"regexp"
 
 	"github.com/elastic/beats/libbeat/common"
-
 	s "github.com/elastic/beats/libbeat/common/schema"
 	c "github.com/elastic/beats/libbeat/common/schema/mapstrstr"
 	"github.com/elastic/beats/libbeat/logp"
-	"github.com/elastic/beats/metricbeat/mb"
 )
 
 var (
@@ -63,7 +61,7 @@ var (
 	}
 )
 
-func eventMapping(response io.Reader, r mb.ReporterV2) {
+func eventMapping(response io.Reader) common.MapStr {
 	fullEvent := map[string]interface{}{}
 	scanner := bufio.NewScanner(response)
 
@@ -77,13 +75,6 @@ func eventMapping(response io.Reader, r mb.ReporterV2) {
 	}
 
 	event, _ := schema.Apply(fullEvent)
-	e := mb.Event{}
-
-	if version, ok := event["version"]; ok {
-		e.RootFields = common.MapStr{}
-		e.RootFields.Put("service.version", version)
-		delete(event, "version")
-	}
 
 	// only exposed by the Leader
 	if _, ok := fullEvent["zk_followers"]; ok {
@@ -95,6 +86,5 @@ func eventMapping(response io.Reader, r mb.ReporterV2) {
 		schemaUnix.ApplyTo(event, fullEvent)
 	}
 
-	e.MetricSetFields = event
-	r.Event(e)
+	return event
 }

@@ -3,7 +3,6 @@
     - "container"
     - "cpu"
     - "diskio"
-    - "event"
     - "healthcheck"
     - "info"
     #- "image"

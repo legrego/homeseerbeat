@@ -24,19 +24,16 @@ import (
 	"github.com/elastic/beats/libbeat/logp"
 )
 
-const logName = "conditions"
-
 // Config represents a configuration for a condition, as you would find it in the config files.
 type Config struct {
-	Equals    *Fields                `config:"equals"`
-	Contains  *Fields                `config:"contains"`
-	Regexp    *Fields                `config:"regexp"`
-	Range     *Fields                `config:"range"`
-	HasFields []string               `config:"has_fields"`
-	Network   map[string]interface{} `config:"network"`
-	OR        []Config               `config:"or"`
-	AND       []Config               `config:"and"`
-	NOT       *Config                `config:"not"`
+	Equals    *Fields  `config:"equals"`
+	Contains  *Fields  `config:"contains"`
+	Regexp    *Fields  `config:"regexp"`
+	Range     *Fields  `config:"range"`
+	HasFields []string `config:"has_fields"`
+	OR        []Config `config:"or"`
+	AND       []Config `config:"and"`
+	NOT       *Config  `config:"not"`
 }
 
 // Condition is the interface for all defined conditions
@@ -72,8 +69,6 @@ func NewCondition(config *Config) (Condition, error) {
 		condition, err = NewRangeCondition(config.Range.fields)
 	case config.HasFields != nil:
 		condition = NewHasFieldsCondition(config.HasFields)
-	case config.Network != nil:
-		condition, err = NewNetworkCondition(config.Network)
 	case len(config.OR) > 0:
 		var conditionsList []Condition
 		conditionsList, err = NewConditionList(config.OR)
@@ -89,13 +84,13 @@ func NewCondition(config *Config) (Condition, error) {
 			condition, err = NewNotCondition(inner)
 		}
 	default:
-		err = errors.New("missing or invalid condition")
+		err = errors.New("missing condition")
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	logp.L().Named(logName).Debugf("New condition %v", condition)
+	logp.Debug("processors", "New condition %s", condition)
 	return condition, nil
 }
 

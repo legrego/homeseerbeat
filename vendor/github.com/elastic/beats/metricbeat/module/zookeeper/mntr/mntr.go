@@ -44,6 +44,7 @@ ZooKeeper mntr Command Output
 package mntr
 
 import (
+	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
 	"github.com/elastic/beats/metricbeat/module/zookeeper"
@@ -72,11 +73,10 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 
 // Fetch fetches metrics from ZooKeeper by making a tcp connection to the
 // command port and sending the "mntr" command and parsing the output.
-func (m *MetricSet) Fetch(r mb.ReporterV2) {
+func (m *MetricSet) Fetch() (common.MapStr, error) {
 	outputReader, err := zookeeper.RunCommand("mntr", m.Host(), m.Module().Config().Timeout)
 	if err != nil {
-		r.Error(errors.Wrap(err, "mntr command failed"))
-		return
+		return nil, errors.Wrap(err, "mntr command failed")
 	}
-	eventMapping(outputReader, r)
+	return eventMapping(outputReader), nil
 }

@@ -22,13 +22,12 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/elastic/beats/heartbeat/monitors"
-	"github.com/elastic/beats/heartbeat/monitors/jobs"
-	"github.com/elastic/beats/heartbeat/monitors/wrappers"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/outputs"
 	"github.com/elastic/beats/libbeat/outputs/transport"
+
+	"github.com/elastic/beats/heartbeat/monitors"
 )
 
 func init() {
@@ -37,11 +36,10 @@ func init() {
 
 var debugf = logp.MakeDebug("http")
 
-// Create makes a new HTTP monitor
 func create(
 	name string,
 	cfg *common.Config,
-) (js []jobs.Job, endpoints int, err error) {
+) (jobs []monitors.Job, endpoints int, err error) {
 	config := defaultConfig
 	if err := cfg.Unpack(&config); err != nil {
 		return nil, 0, err
@@ -77,42 +75,30 @@ func create(
 		return nil, 0, err
 	}
 
-	// Determine whether we're using a proxy or not and then use that to figure out how to
-	// run the job
-	var makeJob func(string) (jobs.Job, error)
+	jobs = make([]monitors.Job, len(config.URLs))
+
 	if config.ProxyURL != "" {
 		transport, err := newRoundTripper(&config, tls)
 		if err != nil {
 			return nil, 0, err
 		}
 
-		makeJob = func(urlStr string) (jobs.Job, error) {
-			return newHTTPMonitorHostJob(urlStr, &config, transport, enc, body, validator)
+		for i, url := range config.URLs {
+			jobs[i], err = newHTTPMonitorHostJob(url, &config, transport, enc, body, validator)
+			if err != nil {
+				return nil, 0, err
+			}
 		}
 	} else {
-		makeJob = func(urlStr string) (jobs.Job, error) {
-			return newHTTPMonitorIPsJob(&config, urlStr, tls, enc, body, validator)
+		for i, url := range config.URLs {
+			jobs[i], err = newHTTPMonitorIPsJob(&config, url, tls, enc, body, validator)
+			if err != nil {
+				return nil, 0, err
+			}
 		}
 	}
 
-	js = make([]jobs.Job, len(config.URLs))
-	for i, urlStr := range config.URLs {
-		u, _ := url.Parse(urlStr)
-		if err != nil {
-			return nil, 0, err
-		}
-
-		job, err := makeJob(urlStr)
-		if err != nil {
-			return nil, 0, err
-		}
-
-		// Assign any execution errors to the error field and
-		// assign the url field
-		js[i] = wrappers.WithURLField(u, job)
-	}
-
-	return js, len(config.URLs), nil
+	return jobs, len(config.URLs), nil
 }
 
 func newRoundTripper(config *Config, tls *transport.TLSConfig) (*http.Transport, error) {

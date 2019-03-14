@@ -2,7 +2,7 @@
   type: group
   description: >
     Cluster stats
-  release: ga
+  release: beta
   fields:
     - name: status
       type: keyword

@@ -8,9 +8,7 @@
         TCP network layer related fields.
       fields:
         - name: port
-          type: alias
-          path: url.port
-          migration: true
+          type: integer
           description: >
             Service port number.
 

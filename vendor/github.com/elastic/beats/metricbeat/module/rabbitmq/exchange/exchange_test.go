@@ -31,16 +31,20 @@ func TestFetchEventContents(t *testing.T) {
 	server := mtest.Server(t, mtest.DefaultServerConfig)
 	defer server.Close()
 
-	reporter := &mbtest.CapturingReporterV2{}
+	config := map[string]interface{}{
+		"module":     "rabbitmq",
+		"metricsets": []string{"exchange"},
+		"hosts":      []string{server.URL},
+	}
 
-	metricSet := mbtest.NewReportingMetricSetV2(t, getConfig(server.URL))
-	metricSet.Fetch(reporter)
+	f := mbtest.NewEventsFetcher(t, config)
+	events, err := f.Fetch()
+	event := events[0]
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
 
-	e := mbtest.StandardizeEvent(metricSet, reporter.GetEvents()[0])
-	t.Logf("%s/%s event: %+v", metricSet.Module().Name(), metricSet.Name(), e.Fields.StringToPrint())
-
-	ee, _ := e.Fields.GetValue("rabbitmq.exchange")
-	event := ee.(common.MapStr)
+	t.Logf("%s/%s event: %+v", f.Module().Name(), f.Name(), event.StringToPrint())
 
 	messagesExpected := common.MapStr{
 		"publish_in": common.MapStr{
@@ -54,31 +58,10 @@ func TestFetchEventContents(t *testing.T) {
 	}
 
 	assert.Equal(t, "exchange.name", event["name"])
+	assert.Equal(t, "guest", event["user"])
+	assert.Equal(t, "/", event["vhost"])
 	assert.Equal(t, true, event["durable"])
 	assert.Equal(t, false, event["auto_delete"])
 	assert.Equal(t, false, event["internal"])
 	assert.Equal(t, messagesExpected, event["messages"])
-}
-
-func TestData(t *testing.T) {
-	server := mtest.Server(t, mtest.DefaultServerConfig)
-	defer server.Close()
-
-	ms := mbtest.NewReportingMetricSetV2(t, getConfig(server.URL))
-	err := mbtest.WriteEventsReporterV2Cond(ms, t, "", func(e common.MapStr) bool {
-		hasIn, _ := e.HasKey("rabbitmq.exchange.messages.publish_in")
-		hasOut, _ := e.HasKey("rabbitmq.exchange.messages.publish_out")
-		return hasIn && hasOut
-	})
-	if err != nil {
-		t.Fatal("write", err)
-	}
-}
-
-func getConfig(url string) map[string]interface{} {
-	return map[string]interface{}{
-		"module":     "rabbitmq",
-		"metricsets": []string{"exchange"},
-		"hosts":      []string{url},
-	}
 }

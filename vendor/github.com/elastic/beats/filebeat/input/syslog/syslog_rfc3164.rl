@@ -42,11 +42,10 @@
   timestamp_rfc3164 = month space day space time;
   time_separator = "T" | "t";
   timestamp_rfc3339 = year "-" month_numeric "-" day_two_digits (time_separator | space) time timezone?;
-  timestamp = (timestamp_rfc3339 | timestamp_rfc3164) ":"?;
+  timestamp = timestamp_rfc3339 | timestamp_rfc3164;
 
-  hostname = ([a-zA-Z0-9\.\-_:]*([a-zA-Z0-9] | "::"))+>tok $lookahead_duplicates %hostname;
-  hostVars = (hostname ":") | hostname;
-  header = timestamp space hostVars ":"? space;
+  hostname = [a-zA-Z0-9.-_:]+>tok %hostname;
+  header = timestamp space hostname space;
 
   # MSG
   # https://tools.ietf.org/html/rfc3164#section-4.1.3
@@ -55,9 +54,7 @@
   syslogprog = program ("[" pid "]")? ":" space;
   message = any+>tok %message;
   msg = syslogprog? message>tok %message;
-  sequence = digit+ ":" space>tok %sequence;
 
-  main := (prio)?(sequence)? (header msg | timestamp space message | message);
-  catch_all := message;
+  main := (prio)? (header msg | timestamp space message | message);
 
 }%%

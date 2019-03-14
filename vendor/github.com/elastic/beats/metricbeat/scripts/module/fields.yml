@@ -1,7 +1,8 @@
 - key: {module}
   title: "{module}"
-  release: beta
   description: >
+    experimental[]
+
     {module} module
   fields:
     - name: {module}

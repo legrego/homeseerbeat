@@ -28,17 +28,13 @@ import (
 	"github.com/elastic/beats/dev-tools/mage"
 )
 
-// ModuleDocs collects documentation from modules (both OSS and X-Pack).
-func ModuleDocs() error {
-	dirsWithModules := []string{
-		mage.OSSBeatDir(),
-		mage.XPackBeatDir(),
-	}
+// CollectDocs collects documentation from modules.
+func CollectDocs(basePaths ...string) error {
 
 	// Generate config.yml files for each module.
 	var configFiles []string
-	for _, path := range dirsWithModules {
-		files, err := mage.FindFiles(filepath.Join(path, configTemplateGlob))
+	for _, path := range basePaths {
+		files, err := mage.FindFiles(filepath.Join(path, ConfigTemplateGlob))
 		if err != nil {
 			return errors.Wrap(err, "failed to find config templates")
 		}
@@ -61,7 +57,7 @@ func ModuleDocs() error {
 	defer mage.Clean(configs)
 
 	// Remove old.
-	for _, path := range dirsWithModules {
+	for _, path := range basePaths {
 		if err := os.RemoveAll(filepath.Join(path, "docs/modules")); err != nil {
 			return err
 		}
@@ -83,21 +79,23 @@ func ModuleDocs() error {
 
 	// TODO: Port this script to Go.
 	args := []string{mage.OSSBeatDir("scripts/docs_collector.py"), "--base-paths"}
-	args = append(args, dirsWithModules...)
+	args = append(args, basePaths...)
 
-	return sh.Run(python, args...)
-}
-
-// FieldDocs generates docs/fields.asciidoc containing all fields
-// (including x-pack).
-func FieldDocs() error {
-	inputs := []string{
-		mage.OSSBeatDir("module"),
-		mage.XPackBeatDir("module"),
-	}
-	output := mage.CreateDir("build/fields/fields.all.yml")
-	if err := mage.GenerateFieldsYAMLTo(output, inputs...); err != nil {
+	err = sh.Run(python, args...)
+	if err != nil {
 		return err
 	}
-	return mage.Docs.FieldDocs(output)
+
+	esBeats, err := mage.ElasticBeatsDir()
+	if err != nil {
+		return err
+	}
+
+	return sh.Run(python, mage.LibbeatDir("scripts/generate_fields_docs.py"),
+		XpackBeatDir(), mage.BeatName, esBeats, "--output_path", mage.OSSBeatDir())
+}
+
+// XpackBeatDir returns the x-pack/{beatname} directory for a Beat.
+func XpackBeatDir() string {
+	return mage.OSSBeatDir("../x-pack", mage.BeatName)
 }

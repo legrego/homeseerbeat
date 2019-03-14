@@ -1,13 +1,8 @@
 {
     "@timestamp": "2017-10-12T08:05:34.853Z",
-    "agent": {
+    "beat": {
         "hostname": "host.example.com",
         "name": "host.example.com"
-    },
-    "event": {
-        "dataset": "haproxy.info",
-        "duration": 115000,
-        "module": "haproxy"
     },
     "haproxy": {
         "info": {
@@ -32,7 +27,7 @@
                     "max": 0,
                     "total": 0
                 },
-                "total": 30
+                "total": 39
             },
             "idle": {
                 "pct": 1
@@ -42,6 +37,7 @@
                     "bytes": 0
                 }
             },
+            "pid": 8,
             "pipes": {
                 "free": 0,
                 "max": 0,
@@ -50,9 +46,9 @@
             "process_num": 1,
             "processes": 1,
             "requests": {
-                "total": 30
+                "total": 39
             },
-            "run_queue": 0,
+            "run_queue": 1,
             "session": {
                 "rate": {
                     "limit": 0,
@@ -61,7 +57,7 @@
                 }
             },
             "sockets": {
-                "max": 8034
+                "max": 8032
             },
             "ssl": {
                 "backend": {
@@ -87,10 +83,10 @@
                     "value": 0
                 }
             },
-            "tasks": 7,
-            "ulimit_n": 8034,
+            "tasks": 5,
+            "ulimit_n": 8032,
             "uptime": {
-                "sec": 30
+                "sec": 441
             },
             "zlib_mem_usage": {
                 "max": 0,
@@ -99,13 +95,9 @@
         }
     },
     "metricset": {
-        "name": "info"
-    },
-    "process": {
-        "pid": 7
-    },
-    "service": {
-        "address": "127.0.0.1:14567",
-        "type": "haproxy"
+        "host": "haproxy:14567",
+        "module": "haproxy",
+        "name": "info",
+        "rtt": 115
     }
 }

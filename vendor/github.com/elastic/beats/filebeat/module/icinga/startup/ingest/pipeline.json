@@ -4,12 +4,17 @@
     "grok": {
       "field": "message",
       "patterns":[
-        "%{WORD:log.level}/%{WORD:icinga.startup.facility}: %{GREEDYMULTILINE:message}"
+        "%{WORD:icinga.startup.severity}/%{WORD:icinga.startup.facility}: %{GREEDYMULTILINE:icinga.startup.message}"
       ],
       "ignore_missing": true,
       "pattern_definitions": {
         "GREEDYMULTILINE": "(.|\n)*"
       }
+    }
+  },
+  {
+    "remove": {
+      "field": "message"
     }
   }],
   "on_failure" : [{

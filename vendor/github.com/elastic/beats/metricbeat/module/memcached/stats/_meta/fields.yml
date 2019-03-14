@@ -2,7 +2,7 @@
   type: group
   description: >
     stats
-  release: ga
+  release: beta
   fields:
     - name: pid
       type: long

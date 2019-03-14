@@ -128,15 +128,9 @@ func TestImportJobs(t *testing.T) {
 	err = ImportMachineLearningJob(client, &mlconfig)
 	assert.NoError(t, err)
 
-	var mlBaseURL string
-	if client.GetVersion().Major < 7 {
-		mlBaseURL = "/_xpack/ml"
-	} else {
-		mlBaseURL = "/_ml"
-	}
-
 	// check by GETing back
-	status, response, err := client.Request("GET", mlBaseURL+"/anomaly_detectors", "", nil, nil)
+
+	status, response, err := client.Request("GET", "/_xpack/ml/anomaly_detectors", "", nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 200, status)
 
@@ -163,7 +157,7 @@ func TestImportJobs(t *testing.T) {
 	}
 	assert.True(t, found)
 
-	status, response, err = client.Request("GET", mlBaseURL+"/datafeeds", "", nil, nil)
+	status, response, err = client.Request("GET", "/_xpack/ml/datafeeds", "", nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 200, status)
 

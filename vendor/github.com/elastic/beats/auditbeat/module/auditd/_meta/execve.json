@@ -11,7 +11,6 @@
             "syscall": "execve",
             "tty": "pts0"
         },
-        "message_type": "syscall",
         "paths": [
             {
                 "dev": "08:01",
@@ -41,8 +40,8 @@
         "session": "11",
         "summary": {
             "actor": {
-                "primary": "1001",
-                "secondary": "1001"
+                "primary": "ubuntu",
+                "secondary": "ubuntu"
             },
             "how": "/bin/uname",
             "object": {
@@ -54,7 +53,8 @@
     "event": {
         "action": "executed",
         "category": "audit-rule",
-        "module": "auditd"
+        "module": "auditd",
+        "type": "syscall"
     },
     "file": {
         "device": "00:00",
@@ -71,44 +71,32 @@
             "uname",
             "-a"
         ],
-        "executable": "/bin/uname",
+        "cwd": "/home/andrew_kroh",
+        "exe": "/bin/uname",
         "name": "uname",
-        "pid": 10043,
-        "ppid": 10027,
-        "title": "uname -a",
-        "working_directory": "/home/andrew_kroh"
-    },
-    "service": {
-        "type": "auditd"
+        "pid": "10043",
+        "ppid": "10027",
+        "title": "uname -a"
     },
     "tags": [
         "user_commands"
     ],
     "user": {
-        "audit": {
-            "id": "1001"
+        "auid": "1001",
+        "egid": "1002",
+        "euid": "1001",
+        "fsgid": "1002",
+        "fsuid": "1001",
+        "gid": "1002",
+        "name_map": {
+            "auid": "ubuntu",
+            "euid": "ubuntu",
+            "fsuid": "ubuntu",
+            "suid": "ubuntu",
+            "uid": "ubuntu"
         },
-        "effective": {
-            "group": {
-                "id": "1002"
-            },
-            "id": "1001"
-        },
-        "filesystem": {
-            "group": {
-                "id": "1002"
-            },
-            "id": "1001"
-        },
-        "group": {
-            "id": "1002"
-        },
-        "id": "1001",
-        "saved": {
-            "group": {
-                "id": "1002"
-            },
-            "id": "1001"
-        }
+        "sgid": "1002",
+        "suid": "1001",
+        "uid": "1001"
     }
 }
