@@ -3,14 +3,8 @@
 ############################# Homeseerbeat ######################################
 
 homeseerbeat:
-  # Defines how frequently the log file is queried
-  poll: 5s
-
-  # Fully qualified path to the HomeSeer log file
-  homeseer_log_path: /usr/local/HomeSeer/Logs/HomeSeerLog.hsd
-
-  # The number of log entries to read/publish at a time
-  log_batch_size: 1000
+  # Defines how often an event is sent to the output
+  period: 1s
 
 #================================ General ======================================
 

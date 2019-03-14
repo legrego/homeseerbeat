@@ -370,6 +370,19 @@ Image labels.
 
 None
 
+
+*`counter`*::
++
+--
+type: long
+
+required: True
+
+PLEASE UPDATE DOCUMENTATION
+
+
+--
+
 [[exported-fields-host-processor]]
 == Host fields
 
