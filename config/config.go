@@ -6,9 +6,15 @@ package config
 import "time"
 
 type Config struct {
-	Period time.Duration `config:"period"`
+	Poll            time.Duration `config:"poll"`
+	StatePath       string        `config:"state_path"`
+	HomeSeerLogPath string        `config:"homeseer_log_path"`
+	LogBatchSize    int           `config:"log_batch_size"`
 }
 
 var DefaultConfig = Config{
-	Period: 1 * time.Second,
+	Poll:            5 * time.Second,
+	StatePath:       "./homeseerbeat_state.json",
+	HomeSeerLogPath: "/usr/local/HomeSeer/Data/HomeSeerLog.hsd",
+	LogBatchSize:    1000,
 }
