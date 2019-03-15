@@ -3,11 +3,13 @@ package readers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"time"
 
 	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/paths"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -31,7 +33,7 @@ type readerState struct {
 var db *sql.DB
 
 // InitLogReader initializes this data reader
-func InitLogReader(dataPath string) error {
+func InitLogReader(stateFile string, dataPath string) error {
 	logp.Info("Initilizing reader. Opening HomeSeer database at %s", dataPath)
 
 	var err error
@@ -40,15 +42,23 @@ func InitLogReader(dataPath string) error {
 		logp.Error(err)
 		return err
 	}
+
+	statePath := paths.Resolve(paths.Data, "")
+	logp.Info("Creating state file directory at %s", statePath)
+	err = os.MkdirAll(statePath, 0750)
+	if err != nil {
+		return fmt.Errorf("Failed to created state file dir %s: %v", statePath, err)
+	}
+
 	return nil
 }
 
 // ReadLogs reads the provided HomeSeer log file
-func ReadLogs(statePath string, batchSize int) ([]LogEntry, error) {
+func ReadLogs(stateFile string, batchSize int) ([]LogEntry, error) {
 
 	logp.Info("Starting log read operation")
 
-	state, err := getState(statePath)
+	state, err := getState(stateFile)
 	if err != nil {
 		logp.Error(err)
 		return nil, err
@@ -85,7 +95,7 @@ func ReadLogs(statePath string, batchSize int) ([]LogEntry, error) {
 			LastID: lastID,
 		}
 
-		setState(statePath, *nextState)
+		setState(stateFile, *nextState)
 	}
 
 	logp.Info("Finished reading %d log entries. Last ID read: %d", len(results), lastID)
@@ -101,11 +111,13 @@ func CloseLogReader() {
 	}
 }
 
-func getState(statePath string) (readerState, error) {
+func getState(stateFile string) (readerState, error) {
 	var state readerState
 
-	if fileExists(statePath) {
-		jsonFile, err := os.Open(statePath)
+	stateFileLocation := paths.Resolve(paths.Data, stateFile)
+
+	if fileExists(stateFileLocation) {
+		jsonFile, err := os.Open(stateFileLocation)
 		if err != nil {
 			logp.Error(err)
 			return state, err
@@ -130,13 +142,15 @@ func getState(statePath string) (readerState, error) {
 	return state, nil
 }
 
-func setState(statePath string, state readerState) error {
+func setState(stateFile string, state readerState) error {
 	file, err := json.MarshalIndent(state, "", " ")
 	if err != nil {
 		return err
 	}
 
-	err = ioutil.WriteFile(statePath, file, 0644)
+	stateFileLocation := paths.Resolve(paths.Data, stateFile)
+
+	err = ioutil.WriteFile(stateFileLocation, file, 0644)
 	if err != nil {
 		return err
 	}

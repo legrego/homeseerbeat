@@ -7,14 +7,14 @@ import "time"
 
 type Config struct {
 	Poll            time.Duration `config:"poll"`
-	StatePath       string        `config:"state_path"`
+	StateFile       string        `config:"state_file"`
 	HomeSeerLogPath string        `config:"homeseer_log_path"`
 	LogBatchSize    int           `config:"log_batch_size"`
 }
 
 var DefaultConfig = Config{
 	Poll:            5 * time.Second,
-	StatePath:       "./homeseerbeat_state.json",
+	StateFile:       "homeseerbeat_state.json",
 	HomeSeerLogPath: "/usr/local/HomeSeer/Data/HomeSeerLog.hsd",
 	LogBatchSize:    1000,
 }

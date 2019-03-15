@@ -43,7 +43,7 @@ func (bt *Homeseerbeat) Run(b *beat.Beat) error {
 		return err
 	}
 
-	readers.InitLogReader(bt.config.HomeSeerLogPath)
+	readers.InitLogReader(bt.config.StateFile, bt.config.HomeSeerLogPath)
 
 	ticker := time.NewTicker(bt.config.Poll)
 	for {
@@ -54,7 +54,7 @@ func (bt *Homeseerbeat) Run(b *beat.Beat) error {
 		case <-ticker.C:
 		}
 
-		results, err := readers.ReadLogs(bt.config.StatePath, bt.config.LogBatchSize)
+		results, err := readers.ReadLogs(bt.config.StateFile, bt.config.LogBatchSize)
 		if err != nil {
 			return err
 		}
