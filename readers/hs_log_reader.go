@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/elastic/beats/libbeat/logp"
@@ -83,6 +84,12 @@ func ReadLogs(stateFile string, batchSize int) ([]LogEntry, error) {
 			logp.Error(err)
 			return nil, err
 		}
+
+		correctedTime, _ := correctTimestamp(entry.Datetime)
+		if correctedTime != nil {
+			entry.Datetime = *correctedTime
+		}
+
 		results = append(results, *entry)
 	}
 
@@ -101,6 +108,28 @@ func ReadLogs(stateFile string, batchSize int) ([]LogEntry, error) {
 	logp.Info("Finished reading %d log entries. Last ID read: %d", len(results), lastID)
 
 	return results, nil
+}
+
+func correctTimestamp(timestamp time.Time) (*time.Time, error) {
+	// HomeSeer stores timestamps in the user's preferred timezone, but without any timezone information.
+	// Therefore, we need to read the timestamp out as UTC, and then manually append the correct timezone to the end.
+	// NOTE: This assumes that the preferred timezone stored in HomeSeer matches the timezone of the local system
+	zonename, _ := time.Now().In(time.Local).Zone()
+	dateAsStr := timestamp.Format(time.RFC822)
+	adjustedDateStr := dateAsStr
+	if strings.HasSuffix(dateAsStr, " UTC") {
+		adjustedDateStr = strings.Replace(dateAsStr, " UTC", " "+zonename, 1)
+		adjustedDate, err := time.Parse(time.RFC822, adjustedDateStr)
+		if err != nil {
+			logp.Error(err)
+			return nil, err
+		}
+		return &adjustedDate, nil
+	}
+
+	err := fmt.Errorf("expected %s to end in ' UTC'", dateAsStr)
+	logp.Error(err)
+	return nil, err
 }
 
 // CloseLogReader shuts down the reader

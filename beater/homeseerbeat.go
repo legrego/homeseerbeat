@@ -49,7 +49,6 @@ func (bt *Homeseerbeat) Run(b *beat.Beat) error {
 	for {
 		select {
 		case <-bt.done:
-			readers.CloseLogReader()
 			return nil
 		case <-ticker.C:
 		}
@@ -78,6 +77,7 @@ func (bt *Homeseerbeat) Run(b *beat.Beat) error {
 
 // Stop stops homeseerbeat.
 func (bt *Homeseerbeat) Stop() {
+	readers.CloseLogReader()
 	bt.client.Close()
 	close(bt.done)
 }
